@@ -1,6 +1,7 @@
 import pandas as pd 
 import sys
 import os
+import cv2
 from Image import Image
 
 
@@ -27,6 +28,7 @@ class Museum:
         return images
     
     #Task 2
+ 
     def compute_euclidean_distance(self, image1 : Image, image2: Image) -> float:
         pass
     
@@ -41,6 +43,7 @@ class Museum:
     
     def compute_hellinger_kernel(self, image1 : Image, image2: Image) -> float:
         pass
+
     
     #Task 3/4 -> For an image of the query set, retrieve the top K images with the lowest distance or the highest score from the dataset
     def retrieve_top_K_results(self, image: Image) -> list:
