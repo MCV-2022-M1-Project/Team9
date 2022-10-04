@@ -16,13 +16,14 @@ class Image:
     
     # Assuming entry color is RGB
     def convert_image_color(self, color='LAB') -> np.ndarray:
+        im_BGR = cv2.cvtColor(self.RGB_image, cv2.COLOR_RGB2BGR)
         if color == 'LAB':
-            color_code = cv2.COLOR_RGB2LAB
+            color_code = cv2.COLOR_BGR2LAB
         elif color == 'HSV':
-            color_code = cv2.COLOR_RGB2HSV
+            color_code = cv2.COLOR_BGR2HSV
         elif color == 'YCBCR':
-            color_code = cv2.COLOR_YCrCb2BGR            
-        return cv2.cvtColor(self.RGB_image, color_code)
+            color_code = cv2.COLOR_BGR2YCR_CB            
+        return cv2.cvtColor(im_BGR, color_code)
 
     def read_image_RGB(self) -> np.ndarray:
         return cv2.imread(self.file_directory, cv2.IMREAD_COLOR)
