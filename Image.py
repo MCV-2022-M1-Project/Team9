@@ -28,8 +28,17 @@ class Image:
     def read_image_RGB(self) -> np.ndarray:
         return cv2.imread(self.file_directory, cv2.IMREAD_COLOR)
     
-    def transform_image(self) -> np.ndarray:
-        pass
+    def transform_RGB_image(self) -> np.ndarray:
+        # Pad the RGB image for testing purposes
+        top = 200
+        bottom = 200
+        left = 200
+        right = 300
+        mode = 'constant'
+        constant_values = (0)
+        im_transform = np.pad(self.RGB_image, ((top, bottom), (left, right), (0, 0)), mode, constant_values=constant_values)
+        return im_transform
+
     
     #Task 1
     def compute_histogram_grey_scale(self):
