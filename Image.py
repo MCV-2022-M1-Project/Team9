@@ -1,6 +1,7 @@
 import pandas as pd 
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 
 class Image:
     def __init__(self, file_directory: str) -> None:
@@ -50,11 +51,13 @@ class Image:
     
     #Task 1
     def plot_histogram_grey_scale(self):
-        pass
+        plt.plot(self.histogram_grey_scale_image)
+        plt.show()
     
     #Task 1
     def plot_histogram_RGB(self):
-        pass
+        plt.plot(self.histogram_rgb_image)
+        plt.show()
     
     #Task 5
     def remove_background(self):
