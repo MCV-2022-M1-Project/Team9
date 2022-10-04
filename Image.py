@@ -3,8 +3,9 @@ import cv2
 import numpy as np
 
 class Image:
-    def __init__(self, file_directory: str) -> None:
+    def __init__(self, file_directory: str, id:int) -> None:
         self.file_directory = file_directory
+        self.id = id    #numerical id of the image in str format
         self.grey_scale_image = self.read_image_grey_scale()
         self.RGB_image = self.read_image_RGB()
         self.histogram_grey_scale_image = self.compute_histogram_grey_scale()
