@@ -55,6 +55,7 @@ def main():
     dataset_directory = sys.argv[1]
     query_set_directory = sys.argv[2]
     museum = Museum(dataset_directory, query_set_directory)
+
     
 
 if __name__ == "__main__":
