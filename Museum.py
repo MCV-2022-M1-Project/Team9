@@ -25,12 +25,17 @@ class Museum:
         self.dataset_directory = dataset_directory
         self.query_set_directory = query_set_directory
         self.relationships = self.read_relationships()
-        #self.dataset = self.read_images(self.dataset_directory)
-        #self.query_set = self.read_images(self.query_set_directory)
+        self.query_gt = self.read_query_gt()
+        self.dataset = self.read_images(self.dataset_directory)
+        self.query_set = self.read_images(self.query_set_directory)
         
     def read_relationships(self):
         print(self.dataset_directory)
         relationships_path = self.dataset_directory + '/relationships.pkl'
+        return pd.read_pickle(relationships_path)
+
+    def read_query_gt(self):
+        relationships_path = self.query_set_directory + '/gt_corresps.pkl'
         return pd.read_pickle(relationships_path)
     
     def read_images(self, directory: str) -> list:
@@ -105,10 +110,10 @@ class Museum:
                 histogram1, histogram2: histograms of the images to compare the similarities of
             Output: chi-squared distance
         """
-        #if both bins have no pixels (array pos==0), ignore them as the chi distance is 0
+        #if both bins have no pixels with that level (array pos==0), ignore them as the chi distance is 0
         np.seterr(divide='ignore', invalid='ignore')
         before_squared = (histogram2 - histogram1)/(histogram1+histogram2)
-        before_squared[np.isnan(before_squared)] = 0    #fix nan values of this case (0/0)
+        before_squared[np.isnan(before_squared)] = 0    #fix nan values of this case (0/0 division)
         x2_distance = np.sum(np.square(before_squared))
         return x2_distance
     
@@ -131,25 +136,24 @@ class Museum:
     
         
         ###temporary values for testing purposes REMOVE AFTER THE SYSTEM GETS JOINED
-        img1 = Image("bbdd_00000.jpg",0)
-        img2 = Image("bbdd_00002.jpg",1)
-        img3 = Image("bbdd_00003.jpg",2)
-        img4 = Image("bbdd_00004.jpg",3)
+        #img1 = Image("bbdd_00000.jpg",0)
+        #img2 = Image("bbdd_00002.jpg",1)
+        #img3 = Image("bbdd_00003.jpg",2)
+        #img4 = Image("bbdd_00004.jpg",3)
 
-        img1.histogram_grey_scale_image = np.bincount((cv2.cvtColor(img1.RGB_image, cv2.COLOR_BGR2GRAY)).ravel(), minlength = 256)
-        img2.histogram_grey_scale_image =  np.bincount((cv2.cvtColor(img2.RGB_image, cv2.COLOR_BGR2GRAY)).ravel(), minlength = 256)
-        img3.histogram_grey_scale_image =  np.bincount((cv2.cvtColor(img3.RGB_image, cv2.COLOR_BGR2GRAY)).ravel(), minlength = 256)
-        img4.histogram_grey_scale_image = np.bincount((cv2.cvtColor(img4.RGB_image, cv2.COLOR_BGR2GRAY)).ravel(), minlength = 256)
-        bbdd_images = [img1, img2, img3, img4]
-        query_image = img1
+        #img2.histogram_grey_scale_image =  np.bincount((cv2.cvtColor(img2.RGB_image, cv2.COLOR_BGR2GRAY)).ravel(), minlength = 256)
+        #img3.histogram_grey_scale_image =  np.bincount((cv2.cvtColor(img3.RGB_image, cv2.COLOR_BGR2GRAY)).ravel(), minlength = 256)
+        #img4.histogram_grey_scale_image = np.bincount((cv2.cvtColor(img4.RGB_image, cv2.COLOR_BGR2GRAY)).ravel(), minlength = 256)
+        #bbdd_images = [img1, img2, img3, img4]
+        #query_image = img1
         ####
 
 
         distances = []
         ids = []
 
-        #for BBDD_current_image in self.dataset:
-        for BBDD_current_image in bbdd_images:        #remove and comment once the system gets joined (proper line is the first one)
+        for BBDD_current_image in self.dataset:
+        #for BBDD_current_image in bbdd_images:        #remove and comment once the system gets joined (proper line is the first one)
             current_distance = self.compute_distances(BBDD_current_image, query_image,distance_string )
             current_id = BBDD_current_image.id
             
@@ -168,8 +172,60 @@ class Museum:
         return ids_sorted[:K]
 
     #Task 4 -> 
-    def compute_MAP_at_k(self):
-        pass
+    def apk(self, actual, predicted, k):
+        """
+        Code belongs to the benhammer repo https://github.com/benhamner/Metrics/blob/master/Python/ml_metrics/average_precision.py
+        Computes the average precision at k.
+        This function computes the average prescision at k between two lists of
+        items.
+        Parameters
+        ----------
+        actual : list
+                A list of elements that are to be predicted (order doesn't matter)
+        predicted : list
+                    A list of predicted elements (order does matter)
+        k : int, optional
+            The maximum number of predicted elements
+        Returns
+        -------
+        score : double
+                The average precision at k over the input lists
+        """
+        if len(predicted)>k:
+            predicted = predicted[:k]
+
+        score = 0.0
+        num_hits = 0.0
+
+        for i,p in enumerate(predicted):
+            if p in actual and p not in predicted[:i]:
+                num_hits += 1.0
+                score += num_hits / (i+1.0)
+
+        if not actual:
+            return 0.0
+
+        return score / min(len(actual), k)
+    def compute_MAP_at_k(self, actual, predicted, k):
+        """
+        Code obtained from the benhammer repo https://github.com/benhamner/Metrics/blob/master/Python/ml_metrics/average_precision.py
+        Computes the mean average precision at k.
+        This function computes the mean average prescision at k between two lists
+        of lists of items.
+        actual : list
+                A list of lists of elements that are to be predicted 
+                (order doesn't matter in the lists)
+        predicted : list
+                    A list of lists of predicted elements
+                    (order matters in the lists)
+        k : int, optional
+            The maximum number of predicted elements
+        Returns
+        score : double
+                The mean average precision at k over the input lists
+        """
+        return np.mean([self.apk(a,p,k) for a,p in zip(actual, predicted)])
+    
     
 
 def main():
@@ -180,13 +236,20 @@ def main():
     distance_arg = args['--distance']
     K = int(args['--K'])
     
-    dataset_directory = sys.argv[1]
-    query_set_directory = sys.argv[2]
+
     museum = Museum(dataset_directory, query_set_directory)
-    top_K_results = museum.retrieve_top_K_results(None,K,distance_arg)
+    predicted_top_K_results = []    #list containing in each position a K-element list of the predictions for that query
+    #for each one of the queries
+    for current_query in museum.query_set:
+        predicted_top_K_results.append(museum.retrieve_top_K_results(current_query,K,distance_arg))
+    
+    print("querygt",museum.query_gt)
+    print("predictions",predicted_top_K_results)
+    mapk_score = museum.compute_MAP_at_k(museum.query_gt, predicted_top_K_results, K)
     
     print("Using distance", distance_arg)
-    print("TOP ",K, " RESULTS: ",top_K_results)
+    print("TOP ",K, " RESULTS: ",predicted_top_K_results)
+    print(mapk_score)
 
 if __name__ == "__main__":
     main()
