@@ -1,9 +1,23 @@
+"""
+Score painting retrieval tasks
+Usage:
+  Museum.py <inputDir> <queryDir> [--distance=<dist>] [--K=<k>]
+  Museum.py -h | --help
+  -
+  <inputDir>               Directory with database data 
+  <queryDir>               Directory with query data
+Options:
+  --distance=<dist>        Distance to compute image similarity (L1, L2, X2, HIST_INTERSECTION, HELLINGER_KERNEL) [default: L1]
+  --K=<k>                  Number of similar results to output [default: 3]
+"""
+
 import pandas as pd 
 import sys
 import numpy as np
 import os
 import cv2
 from Image import Image
+from docopt import docopt
 
 
 class Museum:
@@ -41,6 +55,7 @@ class Museum:
         #uncomment once proper histograms are in the image
         histogram1 = image1.histogram_grey_scale_image
         histogram2 = image2.histogram_grey_scale_image
+
        
         ###temporary values for testing purposes
         #img1 = cv2.imread("bbdd_00000.jpg",0)
@@ -48,29 +63,53 @@ class Museum:
         #histogram1 = np.bincount(img2.ravel(), minlength = 256)
         #histogram2 = np.bincount(img1.ravel(), minlength = 256)
         
+        #cast to int64 just in case
+        histogram1 = np.int64(histogram1)
+        histogram2 = np.int64(histogram2)
+
+        #normalise histogram to not take into account the amount of pixels/how big the picture is into the similarity comparison
+        norm_histogram1 = histogram1/sum(histogram1)
+        norm_histogram2 = histogram2/sum(histogram2)
+
         if distance_string == "L2":
-            distance = self.compute_euclidean_distance(histogram1, histogram2)
+            distance = self.compute_euclidean_distance(norm_histogram1, norm_histogram2)
         elif distance_string =="L1":
-            distance = self.compute_L1_distance(histogram1, histogram2)
+            distance = self.compute_L1_distance(norm_histogram1, norm_histogram2)
         elif distance_string == "X2":
-            distance = self.compute_x2_distance(histogram1, histogram2)
+            distance = self.compute_x2_distance(norm_histogram1, norm_histogram2)
         elif distance_string == "HIST_INTERSECTION":
-            distance = self.compute_histogram_intersection(histogram1, histogram2)
+            distance = self.compute_histogram_intersection(norm_histogram1, norm_histogram2)
         elif distance_string == "HELLINGER_KERNEL":
-            distance = self.compute_hellinger_kernel(histogram1, histogram2)
+            distance = self.compute_hellinger_kernel(norm_histogram1, norm_histogram2)
 
         return distance
     def compute_euclidean_distance(self, histogram1 : np.ndarray, histogram2 : np.ndarray) -> float:
+        """Given two histograms, computes the euclidean distance between them 
+                histogram1, histogram2: histograms of the images to compare the similarities of
+            Output: euclidean distance
+        """
         sum_sq = np.sum(np.square(histogram2 - histogram1))
         euclidean_distance = np.sqrt(sum_sq)
         return euclidean_distance
     
     def compute_L1_distance(self, histogram1 : np.ndarray, histogram2 : np.ndarray) -> float:
+        """Given two histograms, computes the L1 distance between them. 
+                histogram1, histogram2: histograms of the images to compare the similarities of
+            Output: L1 distance
+        """
         l1_distance = sum(abs(histogram2-histogram1))
         return l1_distance
     
     def compute_x2_distance(self, histogram1 : np.ndarray, histogram2 : np.ndarray) -> float:
-        x2_distance = np.sum(np.square(histogram2 - histogram1)/(histogram1+histogram2))
+        """Given two histograms, computes the chi-squared distance between them. 
+                histogram1, histogram2: histograms of the images to compare the similarities of
+            Output: chi-squared distance
+        """
+        #if both bins have no pixels (array pos==0), ignore them as the chi distance is 0
+        np.seterr(divide='ignore', invalid='ignore')
+        before_squared = (histogram2 - histogram1)/(histogram1+histogram2)
+        before_squared[np.isnan(before_squared)] = 0    #fix nan values of this case (0/0)
+        x2_distance = np.sum(np.square(before_squared))
         return x2_distance
     
     def compute_histogram_intersection(self, histogram1 : np.ndarray, histogram2 : np.ndarray) -> float:
@@ -84,9 +123,10 @@ class Museum:
     #Task 3/4 -> F
     def retrieve_top_K_results(self, query_image: Image, K: int, distance_string:str) -> list:
         """Given an image of the query set, retrieve the top K images with the lowest distance speficied by distance_string from the dataset
-            query_image: Image to compute the distances against the BBDD
-            K: # of most similar images returned 
-            distance_string: specifies which distance to use
+                query_image: Image to compute the distances against the BBDD
+                K: # of most similar images returned 
+                distance_string: specifies which distance to use
+            Output: list with the ids of the K most similar images to query_image
         """
     
         
@@ -117,7 +157,13 @@ class Museum:
             ids.append(current_id)
 
         list_distance_ids = list(zip(distances, ids))
-        list_distance_ids.sort()
+
+        #sort ascending to descending if the highest score means the bigger the similarity
+        if(distance_string=="HIST_INTERSECTION" or distance_string =="HELLINGER_KERNEL"):
+            list_distance_ids.sort(reverse = True)
+        else:
+        #sort descending to ascending if the smallest score means the bigger the similarity
+            list_distance_ids.sort()
         ids_sorted = [distances for ids, distances in list_distance_ids]
         return ids_sorted[:K]
 
@@ -127,10 +173,20 @@ class Museum:
     
 
 def main():
+    # read arguments
+    args = docopt(__doc__)
+    dataset_directory = args['<inputDir>']
+    query_set_directory = args['<queryDir>']
+    distance_arg = args['--distance']
+    K = int(args['--K'])
+    
     dataset_directory = sys.argv[1]
     query_set_directory = sys.argv[2]
     museum = Museum(dataset_directory, query_set_directory)
-    museum.retrieve_top_K_results(None,2,"L1")
+    top_K_results = museum.retrieve_top_K_results(None,K,distance_arg)
+    
+    print("Using distance", distance_arg)
+    print("TOP ",K, " RESULTS: ",top_K_results)
 
 if __name__ == "__main__":
     main()
