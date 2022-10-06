@@ -35,7 +35,7 @@ class Museum:
         else:
             with open("database.pkl", 'rb') as f:
                 self.dataset = pickle.load(f)
-            f.close()
+                f.close()
 
         print("Computing query image descriptors")
         self.query_set = self.read_images(self.query_set_directory)
@@ -56,7 +56,9 @@ class Museum:
                 file_directory = os.path.join(directory, file)
                 filename_without_extension = file.split(".")[0]
                 filename_id =  int(filename_without_extension.split("_")[-1])
+                print(file)
                 images.append(Image(file_directory,filename_id))
+                
                 
         return images
     
@@ -67,27 +69,23 @@ class Museum:
             distance_string: Contains the label of the distance that will be used to compute it
         """
 
-        histogram1 = image1.histogram_grey_scale_image
-        histogram2 = image2.histogram_grey_scale_image
+        histogram1 = image1.histogram
+        histogram2 = image2.histogram
         
-        #cast to int64 just in case
-        histogram1 = np.int64(histogram1)
-        histogram2 = np.int64(histogram2)
-
-        #normalise histogram to not take into account the amount of pixels/how big the picture is into the similarity comparison
-        norm_histogram1 = histogram1/sum(histogram1)
-        norm_histogram2 = histogram2/sum(histogram2)
+        #cast to float64 just in case
+        histogram1 = np.float64(histogram1)
+        histogram2 = np.float64(histogram2)
 
         if distance_string == "L2":
-            distance = self.compute_euclidean_distance(norm_histogram1, norm_histogram2)
+            distance = self.compute_euclidean_distance(histogram1, histogram2)
         elif distance_string =="L1":
-            distance = self.compute_L1_distance(norm_histogram1, norm_histogram2)
+            distance = self.compute_L1_distance(histogram1, histogram2)
         elif distance_string == "X2":
-            distance = self.compute_x2_distance(norm_histogram1, norm_histogram2)
+            distance = self.compute_x2_distance(histogram1, histogram2)
         elif distance_string == "HIST_INTERSECTION":
-            distance = self.compute_histogram_intersection(norm_histogram1, norm_histogram2)
+            distance = self.compute_histogram_intersection(histogram1, histogram2)
         elif distance_string == "HELLINGER_KERNEL":
-            distance = self.compute_hellinger_kernel(norm_histogram1, norm_histogram2)
+            distance = self.compute_hellinger_kernel(histogram1, histogram2)
 
         return distance
     def compute_euclidean_distance(self, histogram1 : np.ndarray, histogram2 : np.ndarray) -> float:
@@ -248,7 +246,9 @@ def main():
     
     print("Computing distances with DB images...")
     for current_query in museum.query_set:
+        print("Query: ", current_query.file_directory)
         predicted_top_K_results.append(museum.retrieve_top_K_results(current_query,K,distance_arg))
+        
     
     #print("querygt",museum.query_gt)
     #print("predictions",predicted_top_K_results)
