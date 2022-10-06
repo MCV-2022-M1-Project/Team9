@@ -13,9 +13,6 @@ class Museum:
         self.query_set_directory = query_set_directory
         self.relationships = self.read_relationships()
         self.query_gt = self.read_query_gt()
-        #print("Generating database pkl file")
-        #self.dataset = self.read_images(self.dataset_directory)
-
 
         print("Computing query image descriptors")
         self.query_set = self.read_images(self.query_set_directory)
@@ -29,7 +26,8 @@ class Museum:
         relationships_path = self.query_set_directory + '/gt_corresps.pkl'
         return pd.read_pickle(relationships_path)
     
-    def read_images(self, directory: str) -> list:
+    @staticmethod
+    def read_images(directory: str) -> list:
         images = []
         for file in os.listdir(directory):
             if file.endswith(".jpg"): 
@@ -216,9 +214,6 @@ def main():
         for BBDD_current_image in museum.dataset:
             image_list.append(BBDD_current_image)
         
-        #save list of lists into pkl file
-        with open("database.pkl", 'wb') as f:
-            pickle.dump(image_list, f)
             
 
     ##GENERATE QUERY RESULTS
