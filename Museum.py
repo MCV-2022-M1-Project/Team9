@@ -1,18 +1,3 @@
-"""
-Generate similarity results given a query folder
-Usage:
-  Museum.py <inputDir> <queryDir> [--distance=<dist>] [--K=<k>] [--picklePath=<ppath>] [--generateDB=<gendb>]
-  Museum.py -h | --help
-  -
-  <inputDir>               Directory with database data 
-  <queryDir>               Directory with query data
-Options:
-  --distance=<dist>        Distance to compute image similarity (L1, L2, X2, HIST_INTERSECTION, HELLINGER_KERNEL) [default: L1]
-  --K=<k>                  Number of similar results to output [default: 3]
-  --picklePath=<ppath>     Filename/path to save the pkl results file [default: result.pkl]
-  --generateDB=<gendb>     Regenerate database (True/False) [default: True]
-"""
-
 import pandas as pd 
 import sys
 import numpy as np
@@ -22,20 +7,15 @@ import pickle
 from Image import Image
 from docopt import docopt
 
-
 class Museum:
-    def __init__(self, dataset_directory: str, query_set_directory: str, generateDB:bool) -> None:
+    def __init__(self, dataset_directory: str, query_set_directory: str) -> None:
         self.dataset_directory = dataset_directory
         self.query_set_directory = query_set_directory
         self.relationships = self.read_relationships()
         self.query_gt = self.read_query_gt()
-        if generateDB == "True":
-            print("Generating database pkl file")
-            self.dataset = self.read_images(self.dataset_directory)
-        else:
-            with open("database.pkl", 'rb') as f:
-                self.dataset = pickle.load(f)
-                f.close()
+        #print("Generating database pkl file")
+        #self.dataset = self.read_images(self.dataset_directory)
+
 
         print("Computing query image descriptors")
         self.query_set = self.read_images(self.query_set_directory)
@@ -220,6 +200,7 @@ class Museum:
     
     
 def main():
+    """
     # read arguments
     args = docopt(__doc__)
     dataset_directory = args['<inputDir>']
@@ -261,6 +242,7 @@ def main():
     #save list of lists into pkl file
     with open(pickle_path, 'wb') as f:
         pickle.dump(predicted_top_K_results, f)
+    """
 if __name__ == "__main__":
     main()
 
