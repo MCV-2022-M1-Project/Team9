@@ -29,7 +29,7 @@ The output files is a .pkl file containing a list of lists with the K most simil
   Assuming that `inputDir` is the path of the folder containing the database and queryDir contains the query images and ground truth, the following can be executed to compute the similarity with the default values (distance: `L1`, K: `3` , picklePath: `./result.pkl`, DBpicklePath `database.pkl`, removeBG: `False`)
 
 ```
-  python3 compute_similarity.py inputDir queryDir [--distance=<dist>] [--K=<k>] [--picklePath=<ppath>] [--DBpicklePath=<dbppath>] [--removeBG=<bg>]
+  python3 compute_similarity.py inputDir queryDir 
 ```
 The available option values can be displayed executing the help command:
 ```
