@@ -1,0 +1,1 @@
+('Edvard Munch', 'Evening on Karl Johan')

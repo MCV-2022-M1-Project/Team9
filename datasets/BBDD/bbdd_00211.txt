@@ -1,0 +1,1 @@
+('Francesc Artigau', 'Interior del vestit vermell')

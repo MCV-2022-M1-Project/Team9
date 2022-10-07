@@ -1,0 +1,1 @@
+('Assumpcio Mateu', 'Frontalitat endins')
