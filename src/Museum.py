@@ -5,23 +5,29 @@ from src.Image import Image
 from src.Measures import Measures
 
 class Museum:
-    def __init__(self, dataset_directory: str, query_set_directory: str) -> None:
-        self.dataset_directory = dataset_directory
+    def __init__(self, query_set_directory: str, db_pickle_path:str) -> None:
         self.query_set_directory = query_set_directory
-        self.relationships = self.read_pickle(self.dataset_directory + '/relationships.pkl')
         self.query_gt = self.read_pickle(self.query_set_directory + '/gt_corresps.pkl')
 
+        #load dataset from pkl file
+        with open(db_pickle_path, 'rb') as f:
+            database_data = pickle.load(f)
+            self.dataset = database_data[0] #load image objects containing the id and descriptors
+            self.relationships = database_data[1] #load DB relationships
+            self.config = database_data[2]  #load config info of how the descriptors have been generated
+            f.close()
         print("Computing query image descriptors")
-        self.query_set = self.read_images(self.query_set_directory)
+        self.query_set = self.read_images(self.query_set_directory, self.config)
         
-    def read_pickle(self, file_path):
+        
+    @staticmethod
+    def read_pickle(file_path):
         with open(file_path, 'rb') as pickle_file:
             content = pickle.load(pickle_file)
         
         return content  
-    
     @staticmethod
-    def read_images(directory: str) -> list:
+    def read_images( directory: str, museum_config:dict) -> list:
         images = []
         for file in os.listdir(directory):
             if file.endswith(".jpg"): 
@@ -29,8 +35,7 @@ class Museum:
                 filename_without_extension = file.split(".")[0]
                 filename_id =  int(filename_without_extension.split("_")[-1])
                 print(file)
-                images.append(Image(file_directory,filename_id))
-                
+                images.append(Image(file_directory,filename_id, museum_config))
                 
         return images
     
@@ -41,12 +46,9 @@ class Museum:
             distance_string: Contains the label of the distance that will be used to compute it
         """
 
-        histogram1 = image1.histogram
-        histogram2 = image2.histogram
+        histogram1 = image1.descriptor
+        histogram2 = image2.descriptor
         
-        #cast to float64 just in case
-        histogram1 = np.float64(histogram1)
-        histogram2 = np.float64(histogram2)
 
         if distance_string == "L2":
             distance = Measures.compute_euclidean_distance(histogram1, histogram2)
@@ -61,8 +63,6 @@ class Museum:
 
         return distance
 
-
-    #Task 3/4 -> F
     def retrieve_top_K_results(self, query_image: Image, K: int, distance_string:str) -> list:
         """Given an image of the query set, retrieve the top K images with the lowest distance speficied by distance_string from the dataset
                 query_image: Image to compute the distances against the BBDD
@@ -74,7 +74,6 @@ class Museum:
         distances = []
         ids = []
         for BBDD_current_image in self.dataset:
-        #for BBDD_current_image in bbdd_images:        #remove and comment once the system gets joined (proper line is the first one)
             current_distance = self.compute_distances(BBDD_current_image, query_image,distance_string )
             current_id = BBDD_current_image.id
             
