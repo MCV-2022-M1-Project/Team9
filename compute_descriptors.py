@@ -1,8 +1,8 @@
 """
 Generate descriptors of the database
 Usage:
-  Museum.py <inputDir> [--DBpicklePath=<dbppath] [--histogramType=<histType>] [--nbins=<nbins>]
-  Museum.py -h | --help
+  compute_descriptors.py <inputDir> [--DBpicklePath=<dbppath] [--histogramType=<histType>] [--nbins=<nbins>]
+  compute_descriptors.py -h | --help
   -
   <inputDir>                Directory with database data 
 Options:
@@ -13,10 +13,6 @@ Options:
 
 """
 
-import sys
-import numpy as np
-import os
-import cv2
 import pickle
 from Image import Image
 from Museum import Museum
