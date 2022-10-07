@@ -1,1 +1,6 @@
-env
+#Filenames
+result.pkl
+database.pkl
+
+env/
+

@@ -1,0 +1,1 @@
+('Mario Pasqualotto', 'Els 72 noms de Deu')

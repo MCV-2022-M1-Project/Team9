@@ -1,0 +1,1 @@
+('Josep Ginovart', 'Guitarra vermella ')
