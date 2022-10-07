@@ -3,4 +3,4 @@ result.pkl
 database.pkl
 
 env/
-
+__pycache__/
