@@ -45,7 +45,7 @@ class Measures:
         return histogram_intersection
     
     @staticmethod
-    def compute_hellinger_kernel(shistogram1 : np.ndarray, histogram2 : np.ndarray) -> float:
+    def compute_hellinger_kernel(histogram1 : np.ndarray, histogram2 : np.ndarray) -> float:
         """Given two histograms, computes hellinger kernel distance
             histogram1, histogram2: histograms of the images to compare the similarities of
         Output: hellinger kernel distance
