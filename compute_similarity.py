@@ -46,9 +46,6 @@ def main():
 
       print("Query: ", current_query.file_directory)
       current_query.compute_descriptor(museum.config)
-      
-      print("QUERY CONFIG " ,museum.config)
-      print("QUERY DESCRIPTOR" ,current_query.descriptor)
       predicted_top_K_results.append(museum.retrieve_top_K_results(current_query,K,distance_arg))
         
     #print("querygt",museum.query_gt)

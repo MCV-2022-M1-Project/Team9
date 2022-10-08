@@ -44,15 +44,19 @@ class Image:
         if len(self.mask)>0:
             #set  foreground pixels to 1
             self.mask = self.mask/255
-            print("AFTER",BGR_image)
-            print("MASK",self.mask)
             cv2.imwrite(str(str(self.id)+"maskedImg.png"), BGR_image)
 
         if histogram_type=="GRAYSCALE":
             histogram = self.compute_histogram_grey_scale(BGR_image, nbins)
         
         elif histogram_type=="BGR":
-            histogram = self.compute_histogram_BGR(BGR_image,nbins)
+            histogram = self.compute_histogram_3channel(BGR_image,nbins, "BGR")
+        elif histogram_type=="HSV":
+            histogram = self.compute_histogram_3channel(BGR_image,nbins, "HSV")
+        elif histogram_type=="YCRCB":
+            histogram = self.compute_histogram_3channel(BGR_image,nbins, "YCRCB")
+        elif histogram_type=="LAB":
+            histogram = self.compute_histogram_3channel(BGR_image,nbins, "YCRCB")
 
         #normalise histogram to not take into account the amount of pixels/how big the picture is into the similarity comparison
         norm_histogram = histogram/sum(histogram)
@@ -61,9 +65,27 @@ class Image:
         norm_histogram = np.float64(norm_histogram)
         return norm_histogram
     
-    def compute_histogram_BGR(self, BGR_image,nbins:int):
-        #TODO (output is wrong)
-        return np.bincount((cv2.cvtColor(BGR_image, cv2.COLOR_BGR2GRAY)).ravel(), minlength = 256)
+    def compute_histogram_3channel(self, BGR_image,nbins:int, colourSpace:str):
+        if colourSpace=="BGR":
+            image = BGR_image
+        elif colourSpace=="HSV":
+            image = cv2.cvtColor(BGR_image, cv2.COLOR_BGR2HSV)
+        elif colourSpace=="YCRCB":
+            image = cv2.cvtColor(BGR_image, cv2.COLOR_BGR2YCrCb)
+        elif colourSpace=="LAB":
+            image = cv2.cvtColor(BGR_image, cv2.COLOR_BGR2Lab)
+        if len(self.mask)>0:
+        
+            B_hist, bin_edges = np.histogram(image[:,:,0], bins=nbins, weights = self.mask)
+            G_hist, bin_edges = np.histogram(image[:,:,1], bins=nbins, weights = self.mask)
+            R_hist, bin_edges = np.histogram(image[:,:,2], bins=nbins, weights = self.mask)
+        
+        else:
+            B_hist, bin_edges = np.histogram(image[:,:,0], bins=nbins)
+            G_hist, bin_edges = np.histogram(image[:,:,1], bins=nbins)
+            R_hist, bin_edges = np.histogram(image[:,:,2], bins=nbins)
+        hist = np.concatenate([B_hist, G_hist,R_hist])
+        return hist
 
     
     #Task 1

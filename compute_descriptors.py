@@ -8,7 +8,7 @@ Usage:
 Options:
   
   --DBpicklePath=<dbppath>    Filename/path to save the pkl database generated with compute_descriptors.py [default: database.pkl]
-  --histogramType=<histType>  Type of histogram used to generate the descriptors (GRAYSCALE, BGR)  [default: GRAYSCALE]
+  --histogramType=<histType>  Type of histogram used to generate the descriptors (GRAYSCALE, BGR, HSV, YCRCB, LAB)  [default: GRAYSCALE]
   --nbins=<nbins>             Number of bins of the histograms [default: 16]
   --descriptorType=<dtype>    Type of descriptor (1Dhistogram) [default: 1Dhistogram]
 """
