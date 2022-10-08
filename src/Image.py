@@ -7,7 +7,8 @@ class Image:
         self.id = id    #numerical id of the image in str format
         self.mask = []  #initialise mask as empty, if the mask is [] it will be ignored. In cases where background will be removed, this mask will get updated with the foreground estimate mask
         #image information is not saved into image objects (ironically). If the image information is needed, it can be read with file_directory (image path). This is to avoid storing all images into the DB and only use images when needed
-    
+        self.image_filename = file_directory.split("/")[-1]
+
     def convert_image_grey_scale(self, BGR_image) -> np.ndarray:
         return cv2.cvtColor(BGR_image, cv2.COLOR_BGR2GRAY)
 
@@ -44,7 +45,6 @@ class Image:
         if len(self.mask)>0:
             #set  foreground pixels to 1
             self.mask = self.mask/255
-            cv2.imwrite(str(str(self.id)+"maskedImg.png"), BGR_image)
 
         if histogram_type=="GRAYSCALE":
             histogram = self.compute_histogram_grey_scale(BGR_image, nbins)
@@ -97,7 +97,7 @@ class Image:
         pass
     
     #Task 5
-    def remove_background(self):
+    def remove_background(self, save_masks_path:str):
     #temporarily pasted code from Task.py to test fscore metrics!! 
         image = cv2.imread(self.file_directory)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -115,10 +115,10 @@ class Image:
 
         masked_image = cv2.bitwise_and(image, image, mask=mask_inv)
         masked_image = cv2.cvtColor(masked_image, cv2.COLOR_HSV2BGR) 
-
-        cv2.imwrite(str(str(self.id)+"mask.png"), mask_inv)
+        filename_without_extension =  self.image_filename.split(".")[0]
+        print("AAAAAAAAAAA")
+        cv2.imwrite(str(str(self.id)+".png"), mask_inv)
         
-        cv2.imwrite(str(str(self.id)+"maskedImg.png"), masked_image)
 
         return mask_inv
             

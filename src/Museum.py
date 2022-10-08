@@ -19,7 +19,6 @@ class Museum:
         print("Computing query image descriptors")
         self.query_set = self.read_images(self.query_set_directory, self.config)
         
-        
     @staticmethod
     def read_pickle(file_path):
         with open(file_path, 'rb') as pickle_file:
@@ -34,7 +33,7 @@ class Museum:
                 file_directory = os.path.join(directory, file)
                 filename_without_extension = file.split(".")[0]
                 filename_id =  int(filename_without_extension.split("_")[-1])
-                print(file)
+                print("Creating image object of: ",file)
                 images.append(Image(file_directory,filename_id, museum_config))
                 
         return images
