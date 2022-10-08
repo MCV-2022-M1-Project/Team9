@@ -8,7 +8,7 @@ class Museum:
     def __init__(self, query_set_directory: str, db_pickle_path:str) -> None:
         self.query_set_directory = query_set_directory
         self.query_gt = self.read_pickle(self.query_set_directory + '/gt_corresps.pkl')
-
+        print(self.query_gt)
         #load dataset from pkl file
         with open(db_pickle_path, 'rb') as f:
             database_data = pickle.load(f)

@@ -37,15 +37,22 @@ def main():
     ##GENERATE QUERY RESULTS
     predicted_top_K_results = []    #list containing in each position a K-element list of the predictions for that query
     #for each one of the queries
-    
+    avg_precision = 0
+    avg_recall = 0
+    avg_F1_score = 0
+    number_of_queries_mask_evaluation = 0
     print("Computing distances with DB images...")
     for current_query in museum.query_set:
       #if user input specified to remove the background, remove it
       
-      print("remove_bg_flag", remove_bg_flag)
       if remove_bg_flag[0] == "True":
-        print("INT")
-        current_query.mask = current_query.remove_background(save_results_path)  #remove background and save the masks into the given path
+        current_query.mask , pixel_precision, pixel_recall, pixel_F1_score = current_query.remove_background(save_results_path)  #remove background and save the masks into the given path
+        #add scores of each query to the average
+        avg_F1_score = avg_F1_score + pixel_F1_score
+        avg_recall= avg_recall + pixel_recall
+        avg_precision = avg_precision + pixel_precision
+        number_of_queries_mask_evaluation = number_of_queries_mask_evaluation+1
+
 
       print("Query: ", current_query.file_directory)
       current_query.compute_descriptor(museum.config)
@@ -58,6 +65,13 @@ def main():
     print("Using distance", distance_arg)
     #print("TOP ",K, " RESULTS: ",predicted_top_K_results)
     print("MAPK score: ",mapk_score)
+    if(number_of_queries_mask_evaluation>0):
+      avg_F1_score = float(avg_F1_score)/float(number_of_queries_mask_evaluation)
+      avg_recall = float(avg_recall)/float(number_of_queries_mask_evaluation)
+      avg_precision = float(avg_precision)/float(number_of_queries_mask_evaluation)
+      print("Average precision: ", str(avg_precision))
+      print("Average recall: ", str(avg_recall))
+      print("Average F1 score: ", str(avg_F1_score))
 
     #save list of lists into pkl file
     with open(str(save_results_path+"result.pkl"), 'wb') as f:

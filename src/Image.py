@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 
+from evaluation.evaluation_funcs import performance_accumulation_pixel, performance_evaluation_pixel
 class Image:
     def __init__(self, file_directory: str, id:int, descriptorConfig:dict) -> None:
         self.file_directory = file_directory
@@ -116,9 +117,16 @@ class Image:
         masked_image = cv2.bitwise_and(image, image, mask=mask_inv)
         masked_image = cv2.cvtColor(masked_image, cv2.COLOR_HSV2BGR) 
         filename_without_extension =  self.image_filename.split(".")[0]
-        print("AAAAAAAAAAA")
-        cv2.imwrite(str(str(self.id)+".png"), mask_inv)
-        
+        #save into inputted path
+        cv2.imwrite(str(save_masks_path+str(self.id)+".png"), mask_inv)
 
-        return mask_inv
+        #load gt mask
+        mask_gt_path = str(self.file_directory.split(".jpg")[0]+".png")
+        mask_gt = cv2.imread(mask_gt_path,0)
+        
+        cv2.imwrite(str("test.png"), mask_gt)
+        [pixelTP, pixelFP, pixelFN, pixelTN] = performance_accumulation_pixel(mask_inv,mask_gt)
+        [pixel_precision, pixel_accuracy, pixel_specificity, pixel_recall] = performance_evaluation_pixel(pixelTP, pixelFP, pixelFN, pixelTN)
+        pixel_F1_score = 2*float(pixel_precision) *float(pixel_recall)/ float(pixel_recall+pixel_precision)
+        return mask_inv, pixel_precision, pixel_recall, pixel_F1_score
             
