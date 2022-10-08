@@ -56,7 +56,7 @@ class Image:
     # Remove background with the border of an HSV image
     def remove_background_hsv_border(self, im, debug=False):
         image_hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
-        
+    
         tmp = [image_hsv[:,:200,:], image_hsv[:,-200:,:],image_hsv[:100,:,:], image_hsv[-100:,:,:]]
         for border in tmp:
             border = border.reshape(-1, border.shape[-1])
@@ -90,7 +90,9 @@ class Image:
             }
         }
             
-        prob_threshold = 0.1
+        prob_threshold = 0.15
+        
+        cannot_remove = 0
         
         for channel in channels:
             # Normalize histogram
@@ -102,41 +104,48 @@ class Image:
             
             # Index positions for min and max indices of histogram
             max_args = channels[channel]['hist_threshold'].nonzero()[0]
-            if max_args[0] == 0:
-                min_i = 0
-            else:
-                min_i = max_args[0] - 1
-            if max_args[-1] == (n_bins-1):
-                max_i = n_bins-1
-            else:
-                max_i = max_args[-1] + 1
             
-            # print(channels[channel]['hist_threshold'])
-            # print(channels[channel]['bins'])
-            channels[channel]['range'] = [channels[channel]['bins'][min_i], channels[channel]['bins'][max_i]]
-            # print(channels[channel]['range'])
+            if len(max_args) >= 1:
+                if max_args[0] == 0:
+                    min_i = 0
+                else:
+                    min_i = max_args[0] - 1
+                if max_args[-1] == (n_bins-1):
+                    max_i = n_bins-1
+                else:
+                    max_i = max_args[-1] + 1
+                
+                # print(channels[channel]['hist_threshold'])
+                # print(channels[channel]['bins'])
+                channels[channel]['range'] = [channels[channel]['bins'][min_i], channels[channel]['bins'][max_i]]
+                # print(channels[channel]['range'])
+            else:
+                cannot_remove = 1
             
         
-        boundaries = [(
-            [channels['hue']['range'][0], channels['saturation']['range'][0], channels['value']['range'][0]],
-            [channels['hue']['range'][1], channels['saturation']['range'][1], channels['value']['range'][1]]
-        )]
+        if cannot_remove != 1:
+            boundaries = [(
+                [channels['hue']['range'][0], channels['saturation']['range'][0], channels['value']['range'][0]],
+                [channels['hue']['range'][1], channels['saturation']['range'][1], channels['value']['range'][1]]
+            )]
 
-        for (lower, upper) in boundaries:
-            lower = np.array(lower, dtype="uint8")
-            upper = np.array(upper, dtype="uint8")
-            mask = 255 - cv2.inRange(image_hsv, lower, upper)
-        
-        if debug == True:
-            plt.subplot(1,4,1)
-            plt.imshow(mask,cmap='gray')    
-            plt.subplot(1,4,2)
-            plt.plot(channels['hue']['hist'], linestyle='--', marker='o')
-            plt.subplot(1,4,3)
-            plt.plot(channels['saturation']['hist'], linestyle='--', marker='o')
-            plt.subplot(1,4,4)
-            plt.plot(channels['value']['hist'], linestyle='--', marker='o')
-            plt.show()
+            for (lower, upper) in boundaries:
+                lower = np.array(lower, dtype="uint8")
+                upper = np.array(upper, dtype="uint8")
+                mask = 255 - cv2.inRange(image_hsv, lower, upper)
+            
+            if debug == True:
+                plt.subplot(1,4,1)
+                plt.imshow(mask,cmap='gray')    
+                plt.subplot(1,4,2)
+                plt.plot(channels['hue']['hist'], linestyle='--', marker='o')
+                plt.subplot(1,4,3)
+                plt.plot(channels['saturation']['hist'], linestyle='--', marker='o')
+                plt.subplot(1,4,4)
+                plt.plot(channels['value']['hist'], linestyle='--', marker='o')
+                plt.show()
+        else:
+            mask = np.ones((im.shape[0], im.shape[1])) * 255
             
         return mask
     
