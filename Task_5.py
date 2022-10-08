@@ -1,21 +1,47 @@
-import cv2
+import cv2 
 import numpy as np
+import matplotlib.pyplot as plt 
 
 def remove_background(self):
     image = cv2.imread(self)
     image_hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-    b = image_hsv[:,:,1]
-    b = np.where(b < 127, 0, 1) #exclude values below 127
-    
-    w = (image_hsv[:,:,2] + 127) 
-    w = np.where(w > 127, 1, 0)  #accept values above 127
-    
-    b_and_w = np.where(b+w > 0, 0, 1).astype(np.uint8)  
-    mask = np.where(b_and_w==0,255,0).astype(np.uint8) 
-    
-    #output = cv2.bitwise_and(image,image,mask=mask)
-    return mask
+    h=image_hsv[:,:,0]
+    s=image_hsv[:,:,1]
+    v=image_hsv[:,:,2]
+
+    hist_h, bin_edges = np.histogram(h, bins='auto')
+    hist_s, bin_edges = np.histogram(s, bins='auto')
+    hist_v, bin_edges = np.histogram(v, bins='auto')
+
+    boundaries = [
+    ([110, np.min(s), np.min(v)], [160, np.max(s), np.max(v)])
+    ]
+
+    for (lower, upper) in boundaries:
+        lower = np.array(lower, dtype="uint8")
+        upper = np.array(upper, dtype="uint8")
+
+        mask = cv2.inRange(image, lower, upper)
+
+    plt.subplot(1,4,1)
+    plt.imshow(mask,cmap='gray')
+
+
+    print (np.max(h))
+    print (np.min(h))
+    print (np.max(s))
+    print (np.min(s))
+    print (np.max(v))
+    print (np.min(v))
+
+    plt.subplot(1,4,2)
+    plt.plot(hist_h)
+    plt.subplot(1,4,3)
+    plt.plot(hist_s)
+    plt.subplot(1,4,4)
+    plt.plot(hist_v)
+    plt.show()
 
 
 def remove_background_2(self):
@@ -32,9 +58,6 @@ def remove_background_2(self):
 
         mask = cv2.inRange(image, lower, upper)
         mask_inv=255-mask
-
-        #output = cv2.bitwise_and(image, image, mask=mask_inv)
-        #output = cv2.cvtColor(output, cv2.COLOR_HSV2BGR) 
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
