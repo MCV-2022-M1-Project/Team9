@@ -42,12 +42,15 @@ def main():
     for current_query in museum.query_set:
       #if user input specified to remove the background, remove it
       if remove_bg_flag == "True":
-        current_query = current_query.remove_background()
+        current_query.mask = current_query.remove_background()
 
       print("Query: ", current_query.file_directory)
+      current_query.compute_descriptor(museum.config)
+      
+      print("QUERY CONFIG " ,museum.config)
+      print("QUERY DESCRIPTOR" ,current_query.descriptor)
       predicted_top_K_results.append(museum.retrieve_top_K_results(current_query,K,distance_arg))
         
-    
     #print("querygt",museum.query_gt)
     #print("predictions",predicted_top_K_results)
     mapk_score = museum.compute_MAP_at_k(museum.query_gt, predicted_top_K_results, K)

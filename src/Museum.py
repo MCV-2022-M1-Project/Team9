@@ -38,7 +38,7 @@ class Museum:
                 images.append(Image(file_directory,filename_id, museum_config))
                 
         return images
-    
+
     def compute_distances(self,image1: Image, image2: Image, distance_string: str = "L2") -> float:
         """
         Given two images and the type of distance, it computes the distance/similarity between their histograms

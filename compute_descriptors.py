@@ -36,8 +36,10 @@ def main():
 
     print("Generating database pkl file")
 
-    #create Image objects (obtain ID and compute descriptors)
+    #create Image objects (obtain ID and filepaths of each image)
     museum_dataset = Museum.read_images(dataset_directory, museum_config)
+    for image_object in museum_dataset:
+      image_object.compute_descriptor(museum_config)
 
     #read relationships file
     DBrelationships = Museum.read_pickle(dataset_directory + '/relationships.pkl')
