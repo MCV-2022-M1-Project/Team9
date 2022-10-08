@@ -1,0 +1,1 @@
+('Antoni Tapies', 'Gran triptic')

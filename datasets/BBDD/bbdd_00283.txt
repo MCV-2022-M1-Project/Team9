@@ -1,0 +1,1 @@
+('Pedro Morero', 'Triptico de las islas')

@@ -1,0 +1,1 @@
+('Pablo Picasso', 'Woman in a Chair')
