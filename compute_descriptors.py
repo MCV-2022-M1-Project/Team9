@@ -21,18 +21,18 @@ def main():
     #read arguments
     args = docopt(__doc__)
     dataset_directory = args['<inputDir>']
-    DBpicklePath = args['--DBpicklePath']
-    descriptorType = args['--descriptorType'] #type of descriptor used to compare the distances
+    db_pickle_path = args['--DBpicklePath']
+    descriptor_type = args['--descriptorType'] #type of descriptor used to compare the distances
 
     #read options specific to the descriptor type
-    if descriptorType =="1Dhistogram":
+    if descriptor_type =="1Dhistogram":
       nbins = int(args['--nbins'])              # # of bins of the histogram DB 
-      histogramType = args['--histogramType']   
+      histogram_type = args['--histogramType']   
 
     #save descriptor configuration 
     #CASE: descriptor = 1D histogram (the only implementation so far)
-    if(descriptorType == "1Dhistogram"):
-      museum_config ={"descriptorType":descriptorType, "histogramType": histogramType ,"nbins": nbins} #empty dictionary with config info
+    if(descriptor_type == "1Dhistogram"):
+      museum_config ={"descriptorType":descriptor_type, "histogramType": histogram_type ,"nbins": nbins} #empty dictionary with config info
 
     print("Generating database pkl file")
 
@@ -42,14 +42,14 @@ def main():
       image_object.compute_descriptor(museum_config)
 
     #read relationships file
-    DBrelationships = Museum.read_pickle(dataset_directory + '/relationships.pkl')
+    db_relationships = Museum.read_pickle(dataset_directory + '/relationships.pkl')
 
     #save list of lists into pkl file
     #first field contains the image objects containing the descriptor information, second field contains relationships.pkl file and the last field contains the configuration of the descriptors
-    with open(DBpicklePath, 'wb') as f:
-            pickle.dump([museum_dataset,DBrelationships, museum_config], f)
+    with open(db_pickle_path, 'wb') as f:
+            pickle.dump([museum_dataset,db_relationships, museum_config], f)
 
-    print([museum_dataset,DBrelationships,museum_config])
+    print([museum_dataset,db_relationships,museum_config])
 
 if __name__ == "__main__":
     main()
