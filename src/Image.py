@@ -53,99 +53,132 @@ class Image:
         plt.show()
     
     #Task 5
-    # Remove background with the border of an HSV image
-    def remove_background_hsv_border(self, im, debug=False):
-        image_hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
-    
-        tmp = [image_hsv[:,:200,:], image_hsv[:,-200:,:],image_hsv[:100,:,:], image_hsv[-100:,:,:]]
+    # Remove background with a specified colorspace
+    def remove_background_color(self, im, colorspace='lab', debug=True):
+        # Convert image to specified colorspace in order to create background mask
+        if colorspace == 'lab':
+            image_hsv = cv2.cvtColor(im, cv2.COLOR_BGR2LAB)
+        elif colorspace == 'hsv':
+            image_hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
+        
+        # Extract image borders
+        tmp = [image_hsv[:,:100,:], image_hsv[:,-100:,:],image_hsv[:100,:,:], image_hsv[-100:,:,:]]
         for border in tmp:
             border = border.reshape(-1, border.shape[-1])
             im_orig_borders = np.stack(border, axis=1)
         im_orig_borders = im_orig_borders.transpose()
 
+        # Search in the image borders, for each channel of the specified colorspace, the predominant values
         h = im_orig_borders[:,0]
         s = im_orig_borders[:,1]
         v = im_orig_borders[:,2]
         
-        n_bins = 16
-        hist_h, bins_h = np.histogram(h, bins=n_bins)
-        hist_s, bins_s = np.histogram(s, bins=n_bins)
-        hist_v, bins_v = np.histogram(v, bins=n_bins)
+        hist_h, bins_h = np.histogram(h, bins=2)
+        hist_s, bins_s = np.histogram(s, bins=2)
+        hist_v, bins_v = np.histogram(v, bins=2)
         
         channels = {
             'hue': {
-                'hist': hist_h,
+                'hist_orig': hist_h,
+                'hist_norm': [],
                 'bins': bins_h,
-                'hist_threshold': []
+                'prob_threshold': 0.1,
+                'hist_threshold': [],
+                'range': [np.min(image_hsv[:, :, 0]), np.max(image_hsv[:, :, 0])]
             },
             'saturation': {
-                'hist': hist_s,
+                'hist_orig': hist_s,
+                'hist_norm': [],
                 'bins': bins_s,
-                'hist_threshold': []
+                'prob_threshold': 0.1,
+                'hist_threshold': [],
+                'range': [np.min(image_hsv[:, :, 1]), np.max(image_hsv[:, :, 1])]
             },
             'value': {
-                'hist': hist_v,
+                'hist_orig': hist_v,
+                'hist_norm': [],
                 'bins': bins_v,
-                'hist_threshold': []
+                'prob_threshold': 0.1,
+                'hist_threshold': [],
+                'range': [np.min(image_hsv[:, :, 2]), np.max(image_hsv[:, :, 2])]
             }
         }
-            
-        prob_threshold = 0.15
         
-        cannot_remove = 0
-        
+        # Search on the concatenated borders, histogram channel values with the largest amount of bins
+        # We do this using a normalized probability histogram of each original histogram
+        # Then we find the contiguous regions with most probability to remove them from the original image
         for channel in channels:
             # Normalize histogram
-            hist = channels[channel]['hist']
-            channels[channel]['hist'] = hist / np.sum(hist)
-            hist = channels[channel]['hist']
+            channels[channel]['hist_norm'] = channels[channel]['hist_orig'] / np.sum(channels[channel]['hist_orig'])
             # Threshold histogram
-            channels[channel]['hist_threshold'] = hist > prob_threshold
+            channels[channel]['hist_threshold'] = channels[channel]['hist_norm'] > channels[channel]['prob_threshold']
+                
+            # From https://stackoverflow.com/questions/68514880/finding-contiguous-regions-in-a-1d-boolean-array
+            # How to seek for contiguous regions efficiently using numpy
+            # Used to find most prob regions
+            runs = np.flatnonzero(np.diff(np.r_[np.int8(0), channels[channel]['hist_threshold'].view(np.int8), np.int8(0)])).reshape(-1, 2)
             
-            # Index positions for min and max indices of histogram
-            max_args = channels[channel]['hist_threshold'].nonzero()[0]
-            
-            if len(max_args) >= 1:
-                if max_args[0] == 0:
+            # Search region of most probability
+            most_prob = 0
+            most_prob_region = 0
+            for i in range(len(runs)):
+                run_for_sum = runs[i]
+                if runs[i][-1] == len(channels[channel]['hist_norm']):
+                    run_for_sum[-1] = run_for_sum[-1] - 1
+                else:
+                    run_for_sum = runs[i]
+                    
+                prob_sum = channels[channel]['hist_norm'][run_for_sum].sum()
+                
+                if prob_sum > most_prob:
+                    most_prob = prob_sum
+                    most_prob_region = runs[i]
+                
+            # Save range of most probable values the borders have in this channel 
+            if most_prob > 0:
+                if most_prob_region[0] == 0:
                     min_i = 0
                 else:
-                    min_i = max_args[0] - 1
-                if max_args[-1] == (n_bins-1):
-                    max_i = n_bins-1
-                else:
-                    max_i = max_args[-1] + 1
+                    min_i = most_prob_region[0] - 1
+                    
+                max_i = most_prob_region[-1]
                 
                 # print(channels[channel]['hist_threshold'])
                 # print(channels[channel]['bins'])
                 channels[channel]['range'] = [channels[channel]['bins'][min_i], channels[channel]['bins'][max_i]]
+                # channels[channel]['range'] = [channels[channel]['bins'][min_i], 255]
                 # print(channels[channel]['range'])
-            else:
-                cannot_remove = 1
-            
         
-        if cannot_remove != 1:
-            boundaries = [(
-                [channels['hue']['range'][0], channels['saturation']['range'][0], channels['value']['range'][0]],
-                [channels['hue']['range'][1], channels['saturation']['range'][1], channels['value']['range'][1]]
-            )]
+        # Remove boundaries
+        boundaries = [(
+            [channels['hue']['range'][0], channels['saturation']['range'][0], channels['value']['range'][0]],
+            [channels['hue']['range'][1], channels['saturation']['range'][1], channels['value']['range'][1]]
+        )]
+        # boundaries = [(
+        #     [128, 0, 0],
+        #     [255, 255, 255]
+        # )]
 
-            for (lower, upper) in boundaries:
-                lower = np.array(lower, dtype="uint8")
-                upper = np.array(upper, dtype="uint8")
-                mask = 255 - cv2.inRange(image_hsv, lower, upper)
-            
-            if debug == True:
-                plt.subplot(1,4,1)
-                plt.imshow(mask,cmap='gray')    
-                plt.subplot(1,4,2)
-                plt.plot(channels['hue']['hist'], linestyle='--', marker='o')
-                plt.subplot(1,4,3)
-                plt.plot(channels['saturation']['hist'], linestyle='--', marker='o')
-                plt.subplot(1,4,4)
-                plt.plot(channels['value']['hist'], linestyle='--', marker='o')
-                plt.show()
-        else:
-            mask = np.ones((im.shape[0], im.shape[1])) * 255
+        for (lower, upper) in boundaries:
+            lower = np.array(lower, dtype="uint8")
+            upper = np.array(upper, dtype="uint8")
+            mask = cv2.inRange(image_hsv, lower, upper)
+            # print(mask)
+            # plt.imshow(mask,cmap='gray')
+            # plt.show()
+        
+        # If debug option is true, show mask and normalized histogram values
+        if debug == True:
+            plt.subplot(1,4,1)
+            # cv2.bitwise_and(im,im, mask=mask)
+            plt.imshow(mask,cmap='gray')    
+            plt.subplot(1,4,2)
+            plt.plot(channels['hue']['bins'][:-1], channels['hue']['hist_norm'], linestyle='--', marker='o')
+            plt.subplot(1,4,3)
+            plt.plot(channels['saturation']['bins'][:-1], channels['saturation']['hist_norm'], linestyle='--', marker='o')
+            plt.subplot(1,4,4)
+            plt.plot(channels['value']['bins'][:-1], channels['value']['hist_norm'], linestyle='--', marker='o')
+            plt.show()
             
         return mask
     
@@ -153,6 +186,7 @@ class Image:
         if color:
             hist = self.compute_histogram_RGB()
             im = self.BGR_image
+            mask_im = self.remove_background_color(im, 'lab', False)
         else:
             hist = self.compute_histogram_grey_scale()
             im = self.grey_scale_image
