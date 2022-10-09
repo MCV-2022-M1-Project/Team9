@@ -1,6 +1,7 @@
 import cv2 
 import numpy as np
 import matplotlib.pyplot as plt 
+from PIL import Image
 
 def remove_background(self):
     image = cv2.imread(self)
@@ -72,4 +73,20 @@ def remove_background_3(self):
 
     output = cv2.bitwise_and(image, image, mask=mask)
 
-    return mask
+    cv2.waitKey()
+
+def crop_background(self, threshold=0):
+
+    image = cv2.imread(self)
+    if len(image.shape) == 3:
+        Im = np.max(image, 2)
+    else:
+        Im = image
+    assert len(Im.shape) == 2
+
+    rows = np.where(np.max(Im, 0) > threshold)[0]
+    if rows.size:
+        cols = np.where(np.max(Im, 1) > threshold)[0]
+        image = image[cols[0]: cols[-1] + 1, rows[0]: rows[-1] + 1]
+    else:
+        image = image[:1, :1]
