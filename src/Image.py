@@ -19,8 +19,15 @@ class Image:
     def read_image_BGR(self) -> np.ndarray:
         return cv2.imread(self.file_directory, cv2.IMREAD_COLOR)
     
-    def compute_histogram_grey_scale(self, BGR_image,nbins:int):
-        grey_scale_image = self.convert_image_grey_scale(BGR_image)
+    def compute_histogram_grey_scale(self, image,nbins:int):
+        """
+        Computes the histogram greyscale histogram. If the image has a mask, it will not take into account the pixels marked as background
+            image: Image to obtain the histogram from
+            nbins: #of bins of the histogram
+
+        """
+        #convert to gray
+        grey_scale_image = self.convert_image_grey_scale(image)
         
         if len(self.mask)>0:
             
@@ -31,6 +38,9 @@ class Image:
     
     
     def compute_descriptor(self, descriptorConfig:dict):
+        """
+        Given the descriptor configuration, it computes it and stores it into the descriptor property
+        """
         #generate descriptor
         descriptorType = descriptorConfig.get("descriptorType")
         if descriptorType=="1Dhistogram":
@@ -40,7 +50,7 @@ class Image:
 
     def compute_histogram(self, histogram_type:str, nbins:int):
         """Computes the histogram of a given image. The histogram type (grayscale, concatenated histograms,...) can be selected with histogram_type
-
+            histogram_type:
 
         """
         #read image
@@ -104,9 +114,8 @@ class Image:
             mask = self.remove_background_otsu(im = im, color = False)
         else:
             mask = self.remove_background_color(im = im, colorspace=method)
-        
         #save mask into inputted path
-        cv2.imwrite(str(save_masks_path+str(self.id)+".png"), mask)
+        cv2.imwrite(str(save_masks_path+str(self.id).zfill(5)+".png"), mask)
 
         if (computeGT =='True'):
             #load gt mask
@@ -273,7 +282,7 @@ class Image:
         max_threshold = 1
         min_threshold = max_threshold - 1
         
-        im_binary = cv2.bitwise_or(np.asarray(im < otsu_thresholds[min_threshold], dtype='uint8'), np.asarray(im > otsu_thresholds[max_threshold], dtype='uint8'))
+        im_binary = np.asarray(im < otsu_thresholds[min_threshold], dtype='uint8')
         
         im_without_background = im * im_binary
         
@@ -298,4 +307,4 @@ class Image:
             # im_cropped = crop_background(im_merged)
             
             
-        return im_binary
+        return im_binary*255

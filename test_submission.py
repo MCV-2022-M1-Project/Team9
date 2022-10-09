@@ -67,7 +67,7 @@ def check_query_file(hypo_name, week, k_val, num_queries, qsn):
         for hyp in hypo:
             if week == 1:
                 if len(hyp) != k_val:
-                    asd
+                    pass
             else:
                 if qsn == 1:
                     if len(hyp) != 1:
