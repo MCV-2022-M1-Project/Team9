@@ -35,6 +35,9 @@ def main():
       museum_config ={"descriptorType":descriptor_type, "histogramType": histogram_type ,"nbins": nbins} #empty dictionary with config info
 
     print("Generating database pkl file")
+    print("Descriptor settings: ")
+    for key, value in museum_config.items():
+        print(key, ' : ', value)
 
     #create Image objects (obtain ID and filepaths of each image)
     museum_dataset = Museum.read_images(dataset_directory, museum_config)
@@ -43,6 +46,7 @@ def main():
 
     #read relationships file
     db_relationships = Museum.read_pickle(dataset_directory + '/relationships.pkl')
+    print("db_relationships", db_relationships)  
 
     #save list of lists into pkl file
     #first field contains the image objects containing the descriptor information, second field contains relationships.pkl file and the last field contains the configuration of the descriptors
