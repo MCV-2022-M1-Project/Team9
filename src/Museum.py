@@ -5,9 +5,13 @@ from src.Image import Image
 from src.Measures import Measures
 
 class Museum:
-    def __init__(self, query_set_directory: str, db_pickle_path:str) -> None:
+    def __init__(self, query_set_directory: str, db_pickle_path:str,gt_flag:str) -> None:
         self.query_set_directory = query_set_directory
-        self.query_gt = self.read_pickle(self.query_set_directory + '/gt_corresps.pkl')
+        #if there's ground truth, store it
+        if(gt_flag=='True'):
+            self.query_gt = self.read_pickle(self.query_set_directory + '/gt_corresps.pkl')
+        else:
+            self.query_gt=[]
 
         #load dataset from pkl file
         with open(db_pickle_path, 'rb') as f:
@@ -19,7 +23,6 @@ class Museum:
         print("Computing query image descriptors")
         self.query_set = self.read_images(self.query_set_directory, self.config)
         
-        
     @staticmethod
     def read_pickle(file_path):
         with open(file_path, 'rb') as pickle_file:
@@ -27,14 +30,18 @@ class Museum:
         
         return content  
     @staticmethod
-    def read_images( directory: str, museum_config:dict) -> list:
+    def read_images( directory: str, museum_config:dict) -> list:        
+        """
+        Given a directory and the descriptor configuration, it creates an image object with those variables
+            directory: Directory where the target images in
+            distance_string: Contains the label of the distance that will be used to compute it
+        """
         images = []
         for file in os.listdir(directory):
             if file.endswith(".jpg"): 
                 file_directory = os.path.join(directory, file)
                 filename_without_extension = file.split(".")[0]
                 filename_id =  int(filename_without_extension.split("_")[-1])
-                print(file)
                 images.append(Image(file_directory,filename_id, museum_config))
                 
         return images
