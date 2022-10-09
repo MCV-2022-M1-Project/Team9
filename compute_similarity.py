@@ -11,9 +11,8 @@ Options:
   --K=<k>                   Number of similar results to output [default: 3]
   --picklePath=<ppath>      Filename/path to save the pkl results file (masks will be saved into the same dir if --removeBG==True) [default: ./]
   --DBpicklePath=<dbppath>  Filename/path to load the pkl database generated with compute_descriptors.py [default: ./database.pkl]
-  --removeBG=<bg>           Whether or not to remove the background of the query images (True/False) [default: False]
+  --removeBG=<bg>           Whether or not to remove the background of the query images. If the value is different than False, it will remove the background using the specified histogram technique (False, HSV, LAB, OTSU) [default: False]
   --GT=<gt>                 Whether or not there's ground truth available (True/False) [default: True]
-  --BGColorspace=<bgc>       Colorspace used for the histograms of background removal [default: hsv]
 """
 
 import pickle
@@ -29,11 +28,10 @@ def main():
     save_results_path = args['--picklePath']
     db_pickle_path = args['--DBpicklePath']
     print("DB PATH", db_pickle_path)
-    remove_bg_flag = args['--removeBG']
+    remove_bg_flag = args['--removeBG'][0]
     gt_flag = args['--GT']
-    bg_colorspace = args['--BGColorspace']
     
-
+    print("FLAG ",remove_bg_flag)
     #load database (descriptors and config of those descriptors/how they are defined) and load query images + compute their descriptions with said configuration
     museum = Museum(query_set_directory,db_pickle_path,gt_flag)
       
@@ -48,9 +46,9 @@ def main():
     for current_query in museum.query_set:
       #if user input specified to remove the background, remove it
       
-      if remove_bg_flag[0] == "True":
+      if remove_bg_flag != "False":
         
-        current_query.mask , pixel_precision, pixel_recall, pixel_F1_score = current_query.remove_background_color(save_results_path,colorspace=bg_colorspace,computeGT=gt_flag )  #remove background and save the masks into the given path
+        current_query.mask , pixel_precision, pixel_recall, pixel_F1_score = current_query.remove_background(save_results_path,method=remove_bg_flag,computeGT=gt_flag )  #remove background and save the masks into the given path
         
         #compute metrics if there's a ground truth
         if(gt_flag=='True'):
@@ -73,7 +71,7 @@ def main():
       print("MAPK score: ",mapk_score)
 
       #compute precision, recall and F1 score of masks if removeBG was activated
-      if remove_bg_flag[0] == "True":
+      if remove_bg_flag!= "False":
         avg_F1_score = float(avg_F1_score)/float(number_of_queries_mask_evaluation)
         avg_recall = float(avg_recall)/float(number_of_queries_mask_evaluation)
         avg_precision = float(avg_precision)/float(number_of_queries_mask_evaluation)

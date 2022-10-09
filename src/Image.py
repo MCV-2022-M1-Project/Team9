@@ -1,6 +1,9 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+
+import skimage
+
 from evaluation.evaluation_funcs import performance_accumulation_pixel, performance_evaluation_pixel
 class Image:
     def __init__(self, file_directory: str, id:int, descriptorConfig:dict) -> None:
@@ -17,7 +20,6 @@ class Image:
         return cv2.imread(self.file_directory, cv2.IMREAD_COLOR)
     
     def compute_histogram_grey_scale(self, BGR_image,nbins:int):
-        #temporary, update once its done
         grey_scale_image = self.convert_image_grey_scale(BGR_image)
         
         if len(self.mask)>0:
@@ -49,15 +51,9 @@ class Image:
 
         if histogram_type=="GRAYSCALE":
             histogram = self.compute_histogram_grey_scale(BGR_image, nbins)
-        
-        elif histogram_type=="BGR":
-            histogram = self.compute_histogram_3channel(BGR_image,nbins, "BGR")
-        elif histogram_type=="HSV":
-            histogram = self.compute_histogram_3channel(BGR_image,nbins, "HSV")
-        elif histogram_type=="YCRCB":
-            histogram = self.compute_histogram_3channel(BGR_image,nbins, "YCRCB")
-        elif histogram_type=="LAB":
-            histogram = self.compute_histogram_3channel(BGR_image,nbins, "YCRCB")
+        #by default, compute 1d concatenated histogram if its not the grayscale one
+        else:
+            histogram = self.compute_histogram_3channel(BGR_image,nbins, histogram_type)
 
         #normalise histogram to not take into account the amount of pixels/how big the picture is into the similarity comparison
         norm_histogram = histogram/sum(histogram)
@@ -92,97 +88,95 @@ class Image:
     
     #Task 1
     def plot_histogram_grey_scale(self):
-        pass
+        plt.plot(self.histogram_grey_scale_image)
+        plt.show()
     
     #Task 1
     def plot_histogram_RGB(self):
-        pass
-    
-    #Task 5
-    def remove_background(self, save_masks_path:str):
-    #temporarily pasted code from Task.py to test fscore metrics!! 
-        image = cv2.imread(self.file_directory)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-
-        boundaries = [
-        ([7, 5, 150], [70, 70, 200])
-        ]
-
-        for (lower, upper) in boundaries:
-            lower = np.array(lower, dtype="uint8")
-            upper = np.array(upper, dtype="uint8")
-
-            mask = cv2.inRange(image, lower, upper)
-            mask_inv=255-mask
-
-        #masked_image = cv2.bitwise_and(image, image, mask=mask_inv)
-        #masked_image = cv2.cvtColor(masked_image, cv2.COLOR_HSV2BGR)
+        plt.plot(self.histogram_rgb_image)
+        plt.show()
 
 
-
-        filename_without_extension =  self.image_filename.split(".")[0]
-        #save into inputted path
-        cv2.imwrite(str(save_masks_path+str(self.id)+".png"), mask_inv)
-
-        #load gt mask
-        mask_gt_path = str(self.file_directory.split(".jpg")[0]+".png")
-        mask_gt = cv2.imread(mask_gt_path,0)
-        
-        cv2.imwrite(str("test.png"), mask_gt)
-        [pixelTP, pixelFP, pixelFN, pixelTN] = performance_accumulation_pixel(mask_inv,mask_gt)
-        [pixel_precision, pixel_accuracy, pixel_specificity, pixel_recall] = performance_evaluation_pixel(pixelTP, pixelFP, pixelFN, pixelTN)
-        pixel_F1_score = 2*float(pixel_precision) *float(pixel_recall)/ float(pixel_recall+pixel_precision)
-        return mask_inv, pixel_precision, pixel_recall, pixel_F1_score
-            
-    # Remove background with a specified colorspace
-    def remove_background_color(self, save_masks_path, computeGT, colorspace='hsv', debug=True):
-        # Convert image to specified colorspace in order to create background mask
+    def remove_background(self, save_masks_path:str, computeGT:str, method:str):
         im = cv2.imread(self.file_directory)
-        if colorspace == 'lab':
-            image_hsv = cv2.cvtColor(im, cv2.COLOR_BGR2LAB)
-        elif colorspace == 'hsv':
-            image_hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
+        if method =="OTSU":
+            print("Removing background with OTSU")
+            mask = self.remove_background_otsu(im = im, color = False)
+        else:
+            mask = self.remove_background_color(im = im, colorspace=method)
+        
+        #save mask into inputted path
+        cv2.imwrite(str(save_masks_path+str(self.id)+".png"), mask)
+
+        if (computeGT =='True'):
+            #load gt mask
+            mask_gt_path = str(self.file_directory.split(".jpg")[0]+".png")
+            mask_gt = cv2.imread(mask_gt_path,0)
+            #compute metrics
+            [pixelTP, pixelFP, pixelFN, pixelTN] = performance_accumulation_pixel(mask,mask_gt)
+            print([pixelTP, pixelFP, pixelFN, pixelTN])
+            [pixel_precision, pixel_accuracy, pixel_specificity, pixel_recall] = performance_evaluation_pixel(pixelTP, pixelFP, pixelFN, pixelTN)
+            if(pixel_precision==0 or pixel_recall==0):
+                pixel_F1_score = 0
+            else:
+                pixel_F1_score = 2*float(pixel_precision) *float(pixel_recall)/ float(pixel_recall+pixel_precision)
+            print("PRECISION: ", pixel_precision)
+            print("RECALL: ", pixel_recall)
+            print("F1 SCORE: ", pixel_F1_score)
+        else:
+            pixel_precision = -1
+            pixel_recall = -1
+            pixel_F1_score = -1
+        
+        return mask, pixel_precision, pixel_recall, pixel_F1_score
+    # Remove background with a specified colorspace
+    def remove_background_color(self, im, colorspace='HSV', debug=False):
+        # Convert image to specified colorspace in order to create background mask
+        if colorspace == 'LAB':
+            image_transformed = cv2.cvtColor(im, cv2.COLOR_BGR2LAB)
+        elif colorspace == 'HSV':
+            image_transformed = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
         
         # Extract image borders
-        tmp = [image_hsv[:,:100,:], image_hsv[:,-100:,:],image_hsv[:100,:,:], image_hsv[-100:,:,:]]
+        tmp = [image_transformed[:,:100,:], image_transformed[:,-100:,:],image_transformed[:100,:,:], image_transformed[-100:,:,:]]
         for border in tmp:
             border = border.reshape(-1, border.shape[-1])
             im_orig_borders = np.stack(border, axis=1)
         im_orig_borders = im_orig_borders.transpose()
 
         # Search in the image borders, for each channel of the specified colorspace, the predominant values
-        h = im_orig_borders[:,0]
-        s = im_orig_borders[:,1]
-        v = im_orig_borders[:,2]
+        channel_1 = im_orig_borders[:,0]
+        channel_2 = im_orig_borders[:,1]
+        channel_3 = im_orig_borders[:,2]
         
-        hist_h, bins_h = np.histogram(h, bins=2)
-        hist_s, bins_s = np.histogram(s, bins=2)
-        hist_v, bins_v = np.histogram(v, bins=2)
+        hist_channel_1, bins_channel_1 = np.histogram(channel_1, bins=4)
+        hist_channel_2, bins_channel_2 = np.histogram(channel_2, bins=4)
+        hist_channel_3, bins_channel_3 = np.histogram(channel_3, bins=4)
         
         channels = {
-            'hue': {
-                'hist_orig': hist_h,
+            'channel_1': {
+                'hist_orig': hist_channel_1,
                 'hist_norm': [],
-                'bins': bins_h,
+                'bins': bins_channel_1,
                 'prob_threshold': 0.1,
                 'hist_threshold': [],
-                'range': [np.min(image_hsv[:, :, 0]), np.max(image_hsv[:, :, 0])]
+                'range': [np.min(image_transformed[:, :, 0]), np.max(image_transformed[:, :, 0])]
             },
-            'saturation': {
-                'hist_orig': hist_s,
+            'channel_2': {
+                'hist_orig': hist_channel_2,
                 'hist_norm': [],
-                'bins': bins_s,
+                'bins': bins_channel_2,
                 'prob_threshold': 0.1,
                 'hist_threshold': [],
-                'range': [np.min(image_hsv[:, :, 1]), np.max(image_hsv[:, :, 1])]
+                'range': [np.min(image_transformed[:, :, 1]), np.max(image_transformed[:, :, 1])]
             },
-            'value': {
-                'hist_orig': hist_v,
+            'channel_3': {
+                'hist_orig': hist_channel_3,
                 'hist_norm': [],
-                'bins': bins_v,
+                'bins': bins_channel_3,
                 'prob_threshold': 0.1,
                 'hist_threshold': [],
-                'range': [np.min(image_hsv[:, :, 2]), np.max(image_hsv[:, :, 2])]
+                'range': [np.min(image_transformed[:, :, 2]), np.max(image_transformed[:, :, 2])]
             }
         }
         
@@ -232,9 +226,10 @@ class Image:
                 # print(channels[channel]['range'])
         
         # Remove boundaries
+        # Add custom threshold because histogram does not take into account last values
         boundaries = [(
-            [channels['hue']['range'][0], channels['saturation']['range'][0], channels['value']['range'][0]],
-            [channels['hue']['range'][1], channels['saturation']['range'][1], channels['value']['range'][1]]
+            [channels['channel_1']['range'][0], channels['channel_2']['range'][0], channels['channel_3']['range'][0]],
+            [channels['channel_1']['range'][1] + 30, channels['channel_2']['range'][1] + 20, channels['channel_3']['range'][1] + 20]
         )]
         # boundaries = [(
         #     [128, 0, 0],
@@ -244,7 +239,7 @@ class Image:
         for (lower, upper) in boundaries:
             lower = np.array(lower, dtype="uint8")
             upper = np.array(upper, dtype="uint8")
-            mask = cv2.inRange(image_hsv, lower, upper)
+            mask = 255 - cv2.inRange(image_transformed, lower, upper)
             # print(mask)
             # plt.imshow(mask,cmap='gray')
             # plt.show()
@@ -255,37 +250,52 @@ class Image:
             # cv2.bitwise_and(im,im, mask=mask)
             plt.imshow(mask,cmap='gray')    
             plt.subplot(1,4,2)
-            plt.plot(channels['hue']['bins'][:-1], channels['hue']['hist_norm'], linestyle='--', marker='o')
+            plt.plot(channels['channel_1']['bins'][:-1], channels['channel_1']['hist_norm'], linestyle='--', marker='o')
             plt.subplot(1,4,3)
-            plt.plot(channels['saturation']['bins'][:-1], channels['saturation']['hist_norm'], linestyle='--', marker='o')
+            plt.plot(channels['channel_2']['bins'][:-1], channels['channel_2']['hist_norm'], linestyle='--', marker='o')
             plt.subplot(1,4,4)
-            plt.plot(channels['value']['bins'][:-1], channels['value']['hist_norm'], linestyle='--', marker='o')
+            plt.plot(channels['channel_3']['bins'][:-1], channels['channel_3']['hist_norm'], linestyle='--', marker='o')
             plt.show()
             
-
-        filename_without_extension =  self.image_filename.split(".")[0]
-
-
-        #save mask into inputted path
-        cv2.imwrite(str(save_masks_path+str(self.id)+".png"), mask)
-
-        if (computeGT =='True'):
-            #load gt mask
-            mask_gt_path = str(self.file_directory.split(".jpg")[0]+".png")
-            mask_gt = cv2.imread(mask_gt_path,0)
-            #compute metrics
-            [pixelTP, pixelFP, pixelFN, pixelTN] = performance_accumulation_pixel(mask,mask_gt)
-            print([pixelTP, pixelFP, pixelFN, pixelTN])
-            [pixel_precision, pixel_accuracy, pixel_specificity, pixel_recall] = performance_evaluation_pixel(pixelTP, pixelFP, pixelFN, pixelTN)
-            if(pixel_precision==0 or pixel_recall==0):
-                pixel_F1_score = 0
-            else:
-                pixel_F1_score = 2*float(pixel_precision) *float(pixel_recall)/ float(pixel_recall+pixel_precision)
-            print("PRECISION,", pixel_precision)
-        else:
-            pixel_precision = -1
-            pixel_recall = -1
-            pixel_F1_score = -1
-
-        return mask, pixel_precision, pixel_recall, pixel_F1_score
+        return mask
     
+    def remove_background_otsu(self, im, color=False):
+        im = self.convert_image_grey_scale(im)  #grayscale image
+    
+        n_classes = 2
+        otsu_thresholds = skimage.filters.threshold_multiotsu(im, classes=n_classes, nbins=256)
+        otsu_thresholds = otsu_thresholds.tolist()
+
+        # Add the last class to sum probability
+        otsu_thresholds.append(255)
+
+        # Threshold to remove
+        max_threshold = 1
+        min_threshold = max_threshold - 1
+        
+        im_binary = cv2.bitwise_or(np.asarray(im < otsu_thresholds[min_threshold], dtype='uint8'), np.asarray(im > otsu_thresholds[max_threshold], dtype='uint8'))
+        
+        im_without_background = im * im_binary
+        
+        # Crop background if necessary
+        def crop_background(image, threshold=0):
+            if len(image.shape) == 3:
+                Im = np.max(image, 2)
+            else:
+                Im = image
+            assert len(Im.shape) == 2
+
+            rows = np.where(np.max(Im, 0) > threshold)[0]
+            if rows.size:
+                cols = np.where(np.max(Im, 1) > threshold)[0]
+                image = image[cols[0]: cols[-1] + 1, rows[0]: rows[-1] + 1]
+            else:
+                image = image[:1, :1]
+                
+            return image
+        
+            # im_merged = cv2.bitwise_and(im, im, mask=im_binary)
+            # im_cropped = crop_background(im_merged)
+            
+            
+        return im_binary
