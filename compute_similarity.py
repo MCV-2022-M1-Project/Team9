@@ -17,7 +17,9 @@ Options:
 
 import pickle
 from src.Museum import Museum
+from src.Measures import Measures
 from docopt import docopt
+import cv2
 
 def main():
     #read arguments
@@ -52,10 +54,22 @@ def main():
     for current_query in museum.query_set:
       #if user input specified to remove the background, remove it
       if remove_bg_flag != "False":
-        current_query.mask , pixel_precision, pixel_recall, pixel_F1_score = current_query.remove_background(save_results_path,method=remove_bg_flag,computeGT=gt_flag )  #remove background and save the masks into the given path
+        current_query.mask = current_query.remove_background(method=remove_bg_flag)  #remove background and save the masks into the given path
         
+        #postprocess mask to improve the results
+        current_query.postprocess_mask()
+
+        #save mask into inputted path
+        cv2.imwrite(str(save_results_path+str(current_query.id).zfill(5)+".png"), current_query.mask)
+
         #compute metrics if there's a ground truth
         if(gt_flag=='True'):
+        
+          #load gt mask
+          mask_gt_path = str(current_query.file_directory.split(".jpg")[0]+".png")
+          mask_gt = cv2.imread(mask_gt_path,0)
+          #compute the fscore, precision and recall
+          pixel_precision, pixel_recall, pixel_F1_score = Measures.compute_mask_metrics(mask = current_query.mask, mask_gt = mask_gt)
           #add scores of each query to the average
           avg_F1_score = avg_F1_score + pixel_F1_score
           avg_recall= avg_recall + pixel_recall

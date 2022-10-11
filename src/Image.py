@@ -1,10 +1,8 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-
 import skimage
 
-from evaluation.evaluation_funcs import performance_accumulation_pixel, performance_evaluation_pixel
 class Image:
     def __init__(self, file_directory: str, id:int, descriptorConfig:dict) -> None:
         self.file_directory = file_directory    
@@ -13,29 +11,22 @@ class Image:
         #image information is not saved into image objects (ironically). If the image information is needed, it can be read with file_directory (image path). This is to avoid storing all images into the DB and only use images when needed
         self.image_filename = file_directory.split("/")[-1]
 
-    def convert_image_grey_scale(self, BGR_image) -> np.ndarray:
-        return cv2.cvtColor(BGR_image, cv2.COLOR_BGR2GRAY)
 
     def read_image_BGR(self) -> np.ndarray:
         return cv2.imread(self.file_directory, cv2.IMREAD_COLOR)
-    
-    def compute_histogram_grey_scale(self, image,nbins:int):
-        """
-        Computes the histogram greyscale histogram. If the image has a mask, it will not take into account the pixels marked as background
-            image: Image to obtain the histogram from
-            nbins: #of bins of the histogram
-
-        """
-        #convert to gray
-        grey_scale_image = self.convert_image_grey_scale(image)
         
-        if len(self.mask)>0:
-            
-            hist, bin_edges = np.histogram(grey_scale_image, bins=nbins, weights = self.mask)
-        else:
-            hist, bin_edges = np.histogram(grey_scale_image, bins=nbins)
-        return hist
+    def convert_image_grey_scale(self, BGR_image) -> np.ndarray:
+        return cv2.cvtColor(BGR_image, cv2.COLOR_BGR2GRAY)
+        
+    def plot_histogram_grey_scale(self):
+        plt.plot(self.histogram_grey_scale_image)
+        plt.show()
     
+    def plot_histogram_RGB(self):
+        plt.plot(self.histogram_rgb_image)
+        plt.show()
+    
+
     
     def compute_descriptor(self, descriptorConfig:dict):
         """
@@ -52,6 +43,8 @@ class Image:
             self.descriptor= self.compute_histogram(histogramType, nbins)
 
         #TODO: multiresolution histogram
+
+    ### HISTOGRAM-RELATED FUNCTIONS
     def compute_histogram(self, histogram_type:str, nbins:int):
         """Computes the histogram of a given image. The histogram type (grayscale, concatenated histograms,...) can be selected with histogram_type
             histogram_type: if GRAYSCALE is selected it will compute the 1d grayscale histogram. If histogram_type contains "HSV", "BGR", "YCBCR" or "LAB" it will
@@ -77,6 +70,23 @@ class Image:
         #cast to float64 just in case
         norm_histogram = np.float64(norm_histogram)
         return norm_histogram
+    
+    def compute_histogram_grey_scale(self, image,nbins:int):
+        """
+        Computes the histogram greyscale histogram. If the image has a mask, it will not take into account the pixels marked as background
+            image: Image to obtain the histogram from
+            nbins: #of bins of the histogram
+
+        """
+        #convert to gray
+        grey_scale_image = self.convert_image_grey_scale(image)
+        
+        if len(self.mask)>0:
+            
+            hist, bin_edges = np.histogram(grey_scale_image, bins=nbins, weights = self.mask)
+        else:
+            hist, bin_edges = np.histogram(grey_scale_image, bins=nbins)
+        return hist
     
     def compute_histogram_3channel(self, BGR_image,nbins:int, colourSpace:str):
         """Computes the concatenated 3 channel histogram of an image, aka an array containing sequentially all of the 1D histograms of each channel
@@ -107,22 +117,11 @@ class Image:
         hist = np.concatenate([chan1_hist, chan2_hist,chan3_hist])
         return hist
 
-    
-    #Task 1
-    def plot_histogram_grey_scale(self):
-        plt.plot(self.histogram_grey_scale_image)
-        plt.show()
-    
-    #Task 1
-    def plot_histogram_RGB(self):
-        plt.plot(self.histogram_rgb_image)
-        plt.show()
 
 
-    def remove_background(self, save_masks_path:str, computeGT:str, method:str):
+    ### BACKGROUND REMOVAL FUNCTIONS
+    def remove_background(self, method:str):
         """Removes the background of the image and saves it in a path. If computeGT is set to True, it will also compute the precision/recall of the mas compared to the GT
-            save_masks_path: path where the resulting masks will be saved into
-            computeGT: whether or not the precision/recall/F1 score will be returned. If this is set to something other than True, the outputted values will be invalid (-1)
             method: method used to remove the background
         """
         im = cv2.imread(self.file_directory)
@@ -134,34 +133,8 @@ class Image:
         elif(method =="LAB" or method=="HSV"):
             mask = self.remove_background_color(im = im, colorspace=method)
 
-        
-        #save mask into inputted path
-        cv2.imwrite(str(save_masks_path+str(self.id).zfill(5)+".png"), mask)
+        return mask
 
-        #compute metrics 
-        if (computeGT =='True'):
-            #load gt mask
-            mask_gt_path = str(self.file_directory.split(".jpg")[0]+".png")
-            mask_gt = cv2.imread(mask_gt_path,0)
-            #compute metrics
-            [pixelTP, pixelFP, pixelFN, pixelTN] = performance_accumulation_pixel(mask,mask_gt)
-            print([pixelTP, pixelFP, pixelFN, pixelTN])
-            [pixel_precision, pixel_accuracy, pixel_specificity, pixel_recall] = performance_evaluation_pixel(pixelTP, pixelFP, pixelFN, pixelTN)
-            if(pixel_precision==0 or pixel_recall==0):
-                pixel_F1_score = 0
-            else:
-                pixel_F1_score = 2*float(pixel_precision) *float(pixel_recall)/ float(pixel_recall+pixel_precision)
-            print("PRECISION: ", pixel_precision)
-            print("RECALL: ", pixel_recall)
-            print("F1 SCORE: ", pixel_F1_score)
-        else:
-            pixel_precision = -1
-            pixel_recall = -1
-            pixel_F1_score = -1
-        
-        return mask, pixel_precision, pixel_recall, pixel_F1_score
-
-    # Remove background with a specified colorspace
     def remove_background_color(self, im, colorspace='HSV', debug=False):
         """
             Given an image and within a specified colorspace, the background colour is estimated (normalised histogram maxima). Afterwards, the image is thresholded considering background
@@ -174,9 +147,9 @@ class Image:
             image_transformed = cv2.cvtColor(im, cv2.COLOR_BGR2LAB)
         elif colorspace == 'HSV':
             image_transformed = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
-        
+       
         # Extract image borders
-        border_size = 100   #size in px of the border used to obtain the background colour estimate
+        border_size = 50   #size in px of the border used to obtain the background colour estimate
         tmp = [image_transformed[:,:border_size,:], image_transformed[:,-border_size:,:],image_transformed[:border_size,:,:], image_transformed[-border_size:,:,:]]
         for border in tmp:
             border = border.reshape(-1, border.shape[-1])
@@ -187,10 +160,10 @@ class Image:
         channel_1 = im_orig_borders[:,0]
         channel_2 = im_orig_borders[:,1]
         channel_3 = im_orig_borders[:,2]
-        
-        hist_channel_1, bins_channel_1 = np.histogram(channel_1, bins=4)
-        hist_channel_2, bins_channel_2 = np.histogram(channel_2, bins=4)
-        hist_channel_3, bins_channel_3 = np.histogram(channel_3, bins=4)
+        nbins = 8
+        hist_channel_1, bins_channel_1 = np.histogram(channel_1, bins=nbins)
+        hist_channel_2, bins_channel_2 = np.histogram(channel_2, bins=nbins)
+        hist_channel_3, bins_channel_3 = np.histogram(channel_3, bins=nbins)
         
         channels = {
             'channel_1': {
@@ -266,18 +239,20 @@ class Image:
         
         # Remove boundaries
         # Add custom threshold because histogram does not take into account last values
+        weights = [30,40,70]
         boundaries = [(
-            [channels['channel_1']['range'][0], channels['channel_2']['range'][0], channels['channel_3']['range'][0]],
-            [channels['channel_1']['range'][1] + 30, channels['channel_2']['range'][1] + 20, channels['channel_3']['range'][1] + 20]
+            [channels['channel_1']['range'][0]-weights[0], channels['channel_2']['range'][0]-weights[1], channels['channel_3']['range'][0]-weights[2]],
+            [channels['channel_1']['range'][1] +weights[0], channels['channel_2']['range'][1] + weights[1], channels['channel_3']['range'][1] + weights[2]]
         )]
+        print(boundaries)
         # boundaries = [(
         #     [128, 0, 0],
         #     [255, 255, 255]
         # )]
 
         for (lower, upper) in boundaries:
-            lower = np.array(lower, dtype="uint8")
-            upper = np.array(upper, dtype="uint8")
+            lower = np.array(lower, dtype="int16")
+            upper = np.array(upper, dtype="int16")
             mask = 255 - cv2.inRange(image_transformed, lower, upper)
             # print(mask)
             # plt.imshow(mask,cmap='gray')
@@ -342,3 +317,9 @@ class Image:
             
             
         return im_binary*255
+
+    ### MASK POST-PROCESSING
+    def postprocess_mask(self):
+        kernel_size = 100
+        kernel = np.ones((kernel_size,kernel_size),np.uint8)
+        self.mask =cv2.morphologyEx(self.mask, cv2.MORPH_CLOSE, kernel)
