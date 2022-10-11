@@ -30,9 +30,9 @@ class Measures:
         """
         #if both bins have no pixels with that level (array pos==0), ignore them as the chi distance is 0
         np.seterr(divide='ignore', invalid='ignore')
-        before_squared = (histogram2 - histogram1)/(histogram1+histogram2)
+        before_squared = np.square((histogram2 - histogram1))/(histogram1+histogram2)
         before_squared[np.isnan(before_squared)] = 0    #fix nan values of this case (0/0 division)
-        x2_distance = np.sum(np.square(before_squared))
+        x2_distance = np.sum(before_squared)
         return x2_distance
     
     @staticmethod
