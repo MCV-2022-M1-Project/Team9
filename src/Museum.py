@@ -6,7 +6,8 @@ from src.Measures import Measures
 
 class Museum:
     def __init__(self, query_set_directory: str, db_pickle_path:str,gt_flag:str) -> None:
-        self.query_set_directory = query_set_directory
+        self.query_set_directory = query_set_directory  #dir of the query set
+
         #if there's ground truth, store it
         if(gt_flag=='True'):
             self.query_gt = self.read_pickle(self.query_set_directory + '/gt_corresps.pkl')
@@ -20,11 +21,15 @@ class Museum:
             self.relationships = database_data[1] #load DB relationships
             self.config = database_data[2]  #load config info of how the descriptors have been generated
             f.close()
-        print("Computing query image descriptors")
+        print("Reading query images")
         self.query_set = self.read_images(self.query_set_directory, self.config)
         
     @staticmethod
     def read_pickle(file_path):
+        """
+        Reads a pickle file and returns the content of it
+            file_path: file_path of the .pkl file
+        """
         with open(file_path, 'rb') as pickle_file:
             content = pickle.load(pickle_file)
         

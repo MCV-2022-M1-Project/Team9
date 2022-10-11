@@ -67,7 +67,6 @@ def main():
       predicted_top_K_results.append(museum.retrieve_top_K_results(current_query,K,distance_arg))
         
     if(gt_flag=='True'):
-      
       #compute mapk score if there's ground truth
       mapk_score = museum.compute_MAP_at_k(museum.query_gt, predicted_top_K_results, K)
       print("Ground truth: ",museum.query_gt)

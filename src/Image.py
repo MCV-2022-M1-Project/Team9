@@ -7,7 +7,7 @@ import skimage
 from evaluation.evaluation_funcs import performance_accumulation_pixel, performance_evaluation_pixel
 class Image:
     def __init__(self, file_directory: str, id:int, descriptorConfig:dict) -> None:
-        self.file_directory = file_directory
+        self.file_directory = file_directory    
         self.id = id    #numerical id of the image in str format
         self.mask = []  #initialise mask as empty, if the mask is [] it will be ignored. In cases where background will be removed, this mask will get updated with the foreground estimate mask
         #image information is not saved into image objects (ironically). If the image information is needed, it can be read with file_directory (image path). This is to avoid storing all images into the DB and only use images when needed
@@ -40,17 +40,23 @@ class Image:
     def compute_descriptor(self, descriptorConfig:dict):
         """
         Given the descriptor configuration, it computes it and stores it into the descriptor property
+            descriptorConfig: dictionary containing information on how to generate the descriptor
         """
         #generate descriptor
         descriptorType = descriptorConfig.get("descriptorType")
+
+        #if it's a 1D histogram
         if descriptorType=="1Dhistogram":
             nbins = descriptorConfig.get("nbins")
             histogramType = descriptorConfig.get("histogramType")
             self.descriptor= self.compute_histogram(histogramType, nbins)
 
+        #TODO: multiresolution histogram
     def compute_histogram(self, histogram_type:str, nbins:int):
         """Computes the histogram of a given image. The histogram type (grayscale, concatenated histograms,...) can be selected with histogram_type
-            histogram_type:
+            histogram_type: if GRAYSCALE is selected it will compute the 1d grayscale histogram. If histogram_type contains "HSV", "BGR", "YCBCR" or "LAB" it will
+                compute the concatenated HSV/BGR/YCBCR/LAB histogram
+            nbins: # of bins of the resultant histogram
 
         """
         #read image
@@ -73,6 +79,12 @@ class Image:
         return norm_histogram
     
     def compute_histogram_3channel(self, BGR_image,nbins:int, colourSpace:str):
+        """Computes the concatenated 3 channel histogram of an image, aka an array containing sequentially all of the 1D histograms of each channel
+            BGR_image: Image to compute the histogram of
+            nbins: # of bins of the resultant histogram
+            colourSpace: colour space where the histogram will be computed in
+
+        """
         if colourSpace=="BGR":
             image = BGR_image
         elif colourSpace=="HSV":
@@ -108,15 +120,25 @@ class Image:
 
 
     def remove_background(self, save_masks_path:str, computeGT:str, method:str):
+        """Removes the background of the image and saves it in a path. If computeGT is set to True, it will also compute the precision/recall of the mas compared to the GT
+            save_masks_path: path where the resulting masks will be saved into
+            computeGT: whether or not the precision/recall/F1 score will be returned. If this is set to something other than True, the outputted values will be invalid (-1)
+            method: method used to remove the background
+        """
         im = cv2.imread(self.file_directory)
+        #remove background using otsu
         if method =="OTSU":
             print("Removing background with OTSU")
-            mask = self.remove_background_otsu(im = im, color = False)
-        else:
+            mask = self.remove_background_otsu(im = im)
+        #remove background using colour thresholds
+        elif(method =="LAB" or method=="HSV"):
             mask = self.remove_background_color(im = im, colorspace=method)
+
+        
         #save mask into inputted path
         cv2.imwrite(str(save_masks_path+str(self.id).zfill(5)+".png"), mask)
 
+        #compute metrics 
         if (computeGT =='True'):
             #load gt mask
             mask_gt_path = str(self.file_directory.split(".jpg")[0]+".png")
@@ -138,8 +160,15 @@ class Image:
             pixel_F1_score = -1
         
         return mask, pixel_precision, pixel_recall, pixel_F1_score
+
     # Remove background with a specified colorspace
     def remove_background_color(self, im, colorspace='HSV', debug=False):
+        """
+            Given an image and within a specified colorspace, the background colour is estimated (normalised histogram maxima). Afterwards, the image is thresholded considering background
+            the pixels with values close to the predicted histogram maximas (intervals stored in boundaries variable) and foreground everything else
+            im: BGR image to remove the background of
+            colorspace: colorspace used to compute the histograms in
+        """
         # Convert image to specified colorspace in order to create background mask
         if colorspace == 'LAB':
             image_transformed = cv2.cvtColor(im, cv2.COLOR_BGR2LAB)
@@ -147,7 +176,8 @@ class Image:
             image_transformed = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
         
         # Extract image borders
-        tmp = [image_transformed[:,:100,:], image_transformed[:,-100:,:],image_transformed[:100,:,:], image_transformed[-100:,:,:]]
+        border_size = 100   #size in px of the border used to obtain the background colour estimate
+        tmp = [image_transformed[:,:border_size,:], image_transformed[:,-border_size:,:],image_transformed[:border_size,:,:], image_transformed[-border_size:,:,:]]
         for border in tmp:
             border = border.reshape(-1, border.shape[-1])
             im_orig_borders = np.stack(border, axis=1)
@@ -268,7 +298,11 @@ class Image:
             
         return mask
     
-    def remove_background_otsu(self, im, color=False):
+    def remove_background_otsu(self, im):
+        """
+            Given an image, a threshold is found using otsu and the resulting mask of the binarisation is outputted
+            im: BGR image to remove the background from
+        """
         im = self.convert_image_grey_scale(im)  #grayscale image
     
         n_classes = 2
