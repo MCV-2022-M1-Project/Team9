@@ -96,6 +96,18 @@ class Measures:
             mask: predicted mask
             mask_gt: ground truth mask
         """
+
+        if mask.shape!=mask_gt.shape:
+            print("IN")
+            print()
+            print()
+            print()
+            print()
+            print()
+            print()
+            print()
+            #mask is rotated
+            mask = np.reshape(mask, (mask.shape[1], mask.shape[0]))
         #obtain TP,FP,FN,TN values
         [pixelTP, pixelFP, pixelFN, pixelTN] = performance_accumulation_pixel(mask,mask_gt)
         #obtain precision and recall

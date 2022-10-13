@@ -1,7 +1,7 @@
 """
 Generate similarity results given a query folder
 Usage:
-  compute_similarity.py <queryDir> [--distance=<dist>] [--K=<k>] [--saveResultsPath=<ppath>] [--DBpicklePath=<dbppath>] [--removeBG=<bg>] [--GT=<gt>] 
+  compute_similarity.py <queryDir> [--distance=<dist>] [--K=<k>] [--saveResultsPath=<ppath>] [--DBpicklePath=<dbppath>] [--removeBG=<bg>] [--GT=<gt>] [--max_paintings=<mp>]
   compute_similarity.py -h | --help
   -
   <inputDir>                Directory with database data 
@@ -13,6 +13,8 @@ Options:
   --DBpicklePath=<dbppath>  Filename/path to load the pkl database generated with compute_descriptors.py [default: ./database.pkl]
   --removeBG=<bg>           Whether or not to remove the background of the query images. If the value is different than False, it will remove the background using the specified histogram technique (False, HSV, LAB, OTSU) [default: False]
   --GT=<gt>                 Whether or not there's ground truth available (True/False) [default: True]
+  --max_paintings=<mp>      Max paintings per image [default: 1]
+
 """
 
 import pickle
@@ -31,6 +33,7 @@ def main():
     db_pickle_path = args['--DBpicklePath']
     remove_bg_flag = args['--removeBG'][0]
     gt_flag = args['--GT']
+    max_paintings = int(args['--max_paintings'])
     
     print("Query directory path: ", save_results_path)
     print("DB .pkl file path ", db_pickle_path)
@@ -76,9 +79,22 @@ def main():
           avg_precision = avg_precision + pixel_precision
           number_of_queries_mask_evaluation = number_of_queries_mask_evaluation+1
 
-      print("Query: ", current_query.file_directory)
-      current_query.compute_descriptor(museum.config)
-      predicted_top_K_results.append(museum.retrieve_top_K_results(current_query,K,distance_arg))
+        print("Query: ", current_query.file_directory)
+
+      if (max_paintings>1):
+        paintings = current_query.count_paintings(max_paintings)  #given a mask, count how may paintings there are
+
+      else:
+        paintings = [current_query]
+      
+      #for each painting in the query image, obtain the descriptor
+      print("Found ", len(paintings), "painting(s)")
+      for painting in paintings:
+        print("Computing descriptor of painting")
+        painting.compute_descriptor(museum.config)
+        #painting.detect_text()
+
+      predicted_top_K_results.append(museum.retrieve_top_K_results(paintings,K,distance_string = distance_arg, max_paintings = max_paintings))
         
     if(gt_flag=='True'):
       #compute mapk score if there's ground truth

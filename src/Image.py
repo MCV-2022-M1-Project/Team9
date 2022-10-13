@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import skimage
 
 class Image:
-    def __init__(self, file_directory: str, id:int, descriptorConfig:dict) -> None:
+    def __init__(self, file_directory: str, id:int) -> None:
         self.file_directory = file_directory    
         self.id = id    #numerical id of the image in str format
         self.mask = []  #initialise mask as empty, if the mask is [] it will be ignored. In cases where background will be removed, this mask will get updated with the foreground estimate mask
@@ -149,7 +149,7 @@ class Image:
             image_transformed = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
        
         # Extract image borders
-        border_size = 50   #size in px of the border used to obtain the background colour estimate
+        border_size = 100   #size in px of the border used to obtain the background colour estimate
         tmp = [image_transformed[:,:border_size,:], image_transformed[:,-border_size:,:],image_transformed[:border_size,:,:], image_transformed[-border_size:,:,:]]
         for border in tmp:
             border = border.reshape(-1, border.shape[-1])
@@ -160,17 +160,18 @@ class Image:
         channel_1 = im_orig_borders[:,0]
         channel_2 = im_orig_borders[:,1]
         channel_3 = im_orig_borders[:,2]
-        nbins = 8
+        nbins = 16
         hist_channel_1, bins_channel_1 = np.histogram(channel_1, bins=nbins)
         hist_channel_2, bins_channel_2 = np.histogram(channel_2, bins=nbins)
         hist_channel_3, bins_channel_3 = np.histogram(channel_3, bins=nbins)
-        
+
+        prob_threshold_channels = [0.1,0.1,0.1]
         channels = {
             'channel_1': {
                 'hist_orig': hist_channel_1,
                 'hist_norm': [],
                 'bins': bins_channel_1,
-                'prob_threshold': 0.1,
+                'prob_threshold': prob_threshold_channels[0],
                 'hist_threshold': [],
                 'range': [np.min(image_transformed[:, :, 0]), np.max(image_transformed[:, :, 0])]
             },
@@ -178,7 +179,7 @@ class Image:
                 'hist_orig': hist_channel_2,
                 'hist_norm': [],
                 'bins': bins_channel_2,
-                'prob_threshold': 0.1,
+                'prob_threshold': prob_threshold_channels[1],
                 'hist_threshold': [],
                 'range': [np.min(image_transformed[:, :, 1]), np.max(image_transformed[:, :, 1])]
             },
@@ -186,7 +187,7 @@ class Image:
                 'hist_orig': hist_channel_3,
                 'hist_norm': [],
                 'bins': bins_channel_3,
-                'prob_threshold': 0.1,
+                'prob_threshold': prob_threshold_channels[2],
                 'hist_threshold': [],
                 'range': [np.min(image_transformed[:, :, 2]), np.max(image_transformed[:, :, 2])]
             }
@@ -205,7 +206,7 @@ class Image:
             # How to seek for contiguous regions efficiently using numpy
             # Used to find most prob regions
             runs = np.flatnonzero(np.diff(np.r_[np.int8(0), channels[channel]['hist_threshold'].view(np.int8), np.int8(0)])).reshape(-1, 2)
-            
+
             # Search region of most probability
             most_prob = 0
             most_prob_region = 0
@@ -239,12 +240,11 @@ class Image:
         
         # Remove boundaries
         # Add custom threshold because histogram does not take into account last values
-        weights = [30,40,70]
+        weights = [30,30,70]    #added custom tolerance to enlarge the found intervals of each channel with different values
         boundaries = [(
             [channels['channel_1']['range'][0]-weights[0], channels['channel_2']['range'][0]-weights[1], channels['channel_3']['range'][0]-weights[2]],
             [channels['channel_1']['range'][1] +weights[0], channels['channel_2']['range'][1] + weights[1], channels['channel_3']['range'][1] + weights[2]]
         )]
-        print(boundaries)
         # boundaries = [(
         #     [128, 0, 0],
         #     [255, 255, 255]
@@ -320,6 +320,64 @@ class Image:
 
     ### MASK POST-PROCESSING
     def postprocess_mask(self):
-        kernel_size = 100
-        kernel = np.ones((kernel_size,kernel_size),np.uint8)
-        self.mask =cv2.morphologyEx(self.mask, cv2.MORPH_CLOSE, kernel)
+        
+        #zero pad image borders (background)
+        padding = 100
+        #add zero padding
+        self.mask = cv2.copyMakeBorder( self.mask,  padding, padding, padding, padding, cv2.BORDER_CONSTANT, None, value = 0)
+        kernel_size_close = 60
+        kernel_close = np.ones((kernel_size_close,kernel_size_close),np.uint8)
+        self.mask =cv2.morphologyEx(self.mask, cv2.MORPH_CLOSE, kernel_close)
+        #remove connected componets under a specific size
+        nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(self.mask, connectivity=8)
+        sizes = stats[1:, -1]; nb_components = nb_components - 1
+        heights = stats[1:,3]
+        widths = stats[1:,2]
+        min_size = 150
+        temp = np.zeros((output.shape))
+        #for every component in the image, keep it only if it's above min_size
+        for i in range(0, nb_components):
+            if widths[i] >= min_size and heights[i] >= min_size:
+                temp[output == i + 1] = 255
+
+        self.mask = temp
+
+        #remove padding
+        self.mask = Image.crop_img(self.mask ,padding,padding,padding,padding)
+        #self.mask = Image.imreconstruct(self.mask, og_mask)
+        
+        
+
+    @staticmethod 
+    def crop_img(image_array,top,bottom,left,right):
+        """ Cuts off the specified amount of pixels of an image
+            top,bottom,keft,right: amount of px to crop in each direction
+            
+        """
+        height = image_array.shape[0]
+        width = image_array.shape[1]
+        cropped_image = image_array[int(top):int(height-bottom),int(left):int(width-right)]
+        return cropped_image
+
+    ### GIVEN A MASK, COUNT PAINTINGS
+    def count_paintings(self, max_paintings: int):
+        self.mask = self.mask.astype(np.uint8)
+        #count mask connected components
+        nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(self.mask, connectivity=8)
+        sizes = stats[1:, -1]; nb_components = nb_components - 1
+        heights = stats[1:,3]
+        widths = stats[1:,2]
+        paintings = []
+        #for each mask
+        for i in range(0, nb_components):
+            temp_mask = np.zeros((output.shape))
+            temp_mask[output == i + 1] = 1
+            possible_painting = Image(self.file_directory,self.id)
+            possible_painting.mask = temp_mask
+            paintings.append(possible_painting)
+        
+        if len(paintings)>max_paintings:
+            #if necessary, obtain the most possible mask
+            paintings = paintings[:max_paintings]
+
+        return paintings
