@@ -7,11 +7,11 @@ Usage:
   <inputDir>                Directory with database data 
   <queryDir>                Directory with query data
 Options:
-  --distance=<dist>         Distance to compute image similarity (L1, L2, X2, HIST_INTERSECTION, HELLINGER_KERNEL) [default: L1]
+  --distance=<dist>         Distance to compute image similarity (L1, L2, X2, HIST_INTERSECTION, HELLINGER_KERNEL) [default: X2]
   --K=<k>                   Number of similar results to output [default: 3]
   --saveResultsPath=<ppath>      Filename/path to save the pkl results file (masks will be saved into the same dir if --removeBG==True) [default: ./]
   --DBpicklePath=<dbppath>  Filename/path to load the pkl database generated with compute_descriptors.py [default: ./database.pkl]
-  --removeBG=<bg>           Whether or not to remove the background of the query images. If the value is different than False, it will remove the background using the specified histogram technique (False, HSV, LAB, OTSU) [default: False]
+  --removeBG=<bg>           Whether or not to remove the background of the query images. If the value is different than False, it will remove the background using the specified technique (False, MORPHOLOGY, HSV, LAB, OTSU) [default: False]
   --GT=<gt>                 Whether or not there's ground truth available (True/False) [default: True]
   --max_paintings=<mp>      Max paintings per image [default: 1]
 
@@ -60,7 +60,7 @@ def main():
         current_query.mask = current_query.remove_background(method=remove_bg_flag)  #remove background and save the masks into the given path
         
         #postprocess mask to improve the results
-        current_query.postprocess_mask()
+        #current_query.postprocess_mask()
 
         #save mask into inputted path
         cv2.imwrite(str(save_results_path+str(current_query.id).zfill(5)+".png"), current_query.mask)
@@ -92,6 +92,7 @@ def main():
       for painting in paintings:
         print("Computing descriptor of painting")
         painting.compute_descriptor(museum.config)
+        #detect text
         #painting.detect_text()
 
       predicted_top_K_results.append(museum.retrieve_top_K_results(paintings,K,distance_string = distance_arg, max_paintings = max_paintings))

@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import skimage
+import math
 
 class Image:
     def __init__(self, file_directory: str, id:int) -> None:
@@ -125,6 +126,7 @@ class Image:
             method: method used to remove the background
         """
         im = cv2.imread(self.file_directory)
+        im = cv2.medianBlur(im,3)
         #remove background using otsu
         if method =="OTSU":
             print("Removing background with OTSU")
@@ -132,6 +134,8 @@ class Image:
         #remove background using colour thresholds
         elif(method =="LAB" or method=="HSV"):
             mask = self.remove_background_color(im = im, colorspace=method)
+        elif(method=="MORPHOLOGY"):
+            mask = self.remove_background_morph()
 
         return mask
 
@@ -149,7 +153,7 @@ class Image:
             image_transformed = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
        
         # Extract image borders
-        border_size = 100   #size in px of the border used to obtain the background colour estimate
+        border_size = 70   #size in px of the border used to obtain the background colour estimate
         tmp = [image_transformed[:,:border_size,:], image_transformed[:,-border_size:,:],image_transformed[:border_size,:,:], image_transformed[-border_size:,:,:]]
         for border in tmp:
             border = border.reshape(-1, border.shape[-1])
@@ -160,7 +164,7 @@ class Image:
         channel_1 = im_orig_borders[:,0]
         channel_2 = im_orig_borders[:,1]
         channel_3 = im_orig_borders[:,2]
-        nbins = 16
+        nbins = 32
         hist_channel_1, bins_channel_1 = np.histogram(channel_1, bins=nbins)
         hist_channel_2, bins_channel_2 = np.histogram(channel_2, bins=nbins)
         hist_channel_3, bins_channel_3 = np.histogram(channel_3, bins=nbins)
@@ -240,10 +244,10 @@ class Image:
         
         # Remove boundaries
         # Add custom threshold because histogram does not take into account last values
-        weights = [30,30,70]    #added custom tolerance to enlarge the found intervals of each channel with different values
+        weights = [20,40,60]    #added custom tolerance to enlarge the found intervals of each channel with different values
         boundaries = [(
             [channels['channel_1']['range'][0]-weights[0], channels['channel_2']['range'][0]-weights[1], channels['channel_3']['range'][0]-weights[2]],
-            [channels['channel_1']['range'][1] +weights[0], channels['channel_2']['range'][1] + weights[1], channels['channel_3']['range'][1] + weights[2]]
+            [channels['channel_1']['range'][1] +weights[0], channels['channel_2']['range'][1] + weights[1]/2, channels['channel_3']['range'][1] + weights[2]/2]
         )]
         # boundaries = [(
         #     [128, 0, 0],
@@ -272,14 +276,12 @@ class Image:
             plt.show()
             
         return mask
-    
     def remove_background_otsu(self, im):
         """
             Given an image, a threshold is found using otsu and the resulting mask of the binarisation is outputted
             im: BGR image to remove the background from
         """
         im = self.convert_image_grey_scale(im)  #grayscale image
-    
         n_classes = 2
         otsu_thresholds = skimage.filters.threshold_multiotsu(im, classes=n_classes, nbins=256)
         otsu_thresholds = otsu_thresholds.tolist()
@@ -294,6 +296,9 @@ class Image:
         im_binary = np.asarray(im < otsu_thresholds[min_threshold], dtype='uint8')
         
         im_without_background = im * im_binary
+        im_binary_inverted = 1-im_binary
+        if(sum(im_binary[1,:]+im_binary[-1,:])+sum(im_binary[:,1]+im_binary[:,-1]))>(sum(im_binary_inverted[1,:]+im_binary_inverted[-1,:])+sum(im_binary_inverted[:,1]+im_binary_inverted[:,-1])):
+            im_binary = im_binary_inverted
         
         # Crop background if necessary
         def crop_background(image, threshold=0):
@@ -318,35 +323,48 @@ class Image:
             
         return im_binary*255
 
-    ### MASK POST-PROCESSING
-    def postprocess_mask(self):
+    def remove_background_morph(self):
+        #define kernels
+        kernel_size_close = 30
+        kernel_size_close2 = 70
+        kernel_size_remove = 1500
+        kernel_size_open = 200
         
-        #zero pad image borders (background)
-        padding = 100
-        #add zero padding
-        self.mask = cv2.copyMakeBorder( self.mask,  padding, padding, padding, padding, cv2.BORDER_CONSTANT, None, value = 0)
-        kernel_size_close = 60
-        kernel_close = np.ones((kernel_size_close,kernel_size_close),np.uint8)
-        self.mask =cv2.morphologyEx(self.mask, cv2.MORPH_CLOSE, kernel_close)
-        #remove connected componets under a specific size
-        nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(self.mask, connectivity=8)
-        sizes = stats[1:, -1]; nb_components = nb_components - 1
-        heights = stats[1:,3]
-        widths = stats[1:,2]
-        min_size = 150
-        temp = np.zeros((output.shape))
-        #for every component in the image, keep it only if it's above min_size
-        for i in range(0, nb_components):
-            if widths[i] >= min_size and heights[i] >= min_size:
-                temp[output == i + 1] = 255
+        gradient_kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(5,5))
+        kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_close,kernel_size_close))
+        kernel_close2 = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_close2,kernel_size_close2))
+        kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_open,kernel_size_open))
+        
+        kernel_close_vert = cv2.getStructuringElement(cv2.MORPH_RECT,(2,kernel_size_remove))
+        kernel_close_hor = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_remove,2))
 
-        self.mask = temp
+        #obtain gradient of grayscale image
+        img = self.read_image_BGR()
+        img_greyscale = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        gradient = cv2.morphologyEx(img, cv2.MORPH_GRADIENT, gradient_kernel)
+        #binarise gradient
+        temp, gradient_binary = cv2.threshold(gradient,30,255,cv2.THRESH_BINARY)
+        mask = gradient_binary[:,:,0]
 
-        #remove padding
-        self.mask = Image.crop_img(self.mask ,padding,padding,padding,padding)
-        #self.mask = Image.imreconstruct(self.mask, og_mask)
+        #add zero padding for morphology tasks 
+        padding = 1500
+        mask = cv2.copyMakeBorder( mask,  padding, padding, padding, padding, cv2.BORDER_CONSTANT, None, value = 0)
         
+        #slight closing to increase edge size
+        mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close)
         
+        #really wide closing in horizontal and vertical directions
+        temp1 = mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close_vert)
+        temp2 = mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close_hor)
+
+        #the mask will be the intersection
+        mask = cv2.bitwise_and(temp1, temp2)
+        
+        #small opening and closing
+        mask = mask =cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel_open)
+        mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close2)
+        mask = Image.crop_img(mask ,padding,padding,padding,padding)
+        return mask
 
     @staticmethod 
     def crop_img(image_array,top,bottom,left,right):
