@@ -55,10 +55,11 @@ class Image:
         """
         #read image
         BGR_image =self.read_image_BGR()
+        """
         if len(self.mask)>0:
             #set  foreground pixels to 1
             self.mask = self.mask/255
-
+        """
         if histogram_type=="GRAYSCALE":
             histogram = self.compute_histogram_grey_scale(BGR_image, nbins)
         #by default, compute 1d concatenated histogram if its not the grayscale one
@@ -324,11 +325,20 @@ class Image:
         return im_binary*255
 
     def remove_background_morph(self):
+        """
+            Given an image, the gradient of its grayscale version is computed (edges of the image) and they are expanded with morphological operations
+        
+        """
+        
+        img = self.read_image_BGR()
+        img_greyscale = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
         #define kernels
-        kernel_size_close = 30
-        kernel_size_close2 = 70
+        kernel_size_close = 20
+        kernel_size_close2 = 100
         kernel_size_remove = 1500
-        kernel_size_open = 200
+        kernel_size_open = 70
+        
         
         gradient_kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(5,5))
         kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_close,kernel_size_close))
@@ -339,11 +349,9 @@ class Image:
         kernel_close_hor = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_remove,2))
 
         #obtain gradient of grayscale image
-        img = self.read_image_BGR()
-        img_greyscale = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gradient = cv2.morphologyEx(img, cv2.MORPH_GRADIENT, gradient_kernel)
         #binarise gradient
-        temp, gradient_binary = cv2.threshold(gradient,30,255,cv2.THRESH_BINARY)
+        temp, gradient_binary = cv2.threshold(gradient,40,255,cv2.THRESH_BINARY)
         mask = gradient_binary[:,:,0]
 
         #add zero padding for morphology tasks 
@@ -364,6 +372,8 @@ class Image:
         mask = mask =cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel_open)
         mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close2)
         mask = Image.crop_img(mask ,padding,padding,padding,padding)
+
+        mask = mask.astype(np.uint8)
         return mask
 
     @staticmethod 
@@ -386,13 +396,15 @@ class Image:
         heights = stats[1:,3]
         widths = stats[1:,2]
         paintings = []
+        min_size = 400
         #for each mask
         for i in range(0, nb_components):
             temp_mask = np.zeros((output.shape))
             temp_mask[output == i + 1] = 1
             possible_painting = Image(self.file_directory,self.id)
             possible_painting.mask = temp_mask
-            paintings.append(possible_painting)
+            if(np.sum(temp_mask)>min_size):
+                paintings.append(possible_painting)
         
         if len(paintings)>max_paintings:
             #if necessary, obtain the most possible mask

@@ -1,7 +1,7 @@
 """
 Generate similarity results given a query folder
 Usage:
-  compute_similarity.py <queryDir> [--distance=<dist>] [--K=<k>] [--saveResultsPath=<ppath>] [--DBpicklePath=<dbppath>] [--removeBG=<bg>] [--GT=<gt>] [--max_paintings=<mp>]
+  compute_similarity.py <queryDir> [--distance=<dist>] [--K=<k>] [--saveResultsPath=<ppath>] [--DBpicklePath=<dbppath>] [--removeBG=<bg>] [--GT=<gt>] [--max_paintings=<mp>] [--read_text=<rt>]
   compute_similarity.py -h | --help
   -
   <inputDir>                Directory with database data 
@@ -14,6 +14,7 @@ Options:
   --removeBG=<bg>           Whether or not to remove the background of the query images. If the value is different than False, it will remove the background using the specified technique (False, MORPHOLOGY, HSV, LAB, OTSU) [default: False]
   --GT=<gt>                 Whether or not there's ground truth available (True/False) [default: True]
   --max_paintings=<mp>      Max paintings per image [default: 1]
+  --read_text=<rt>          Whether or not there is text to read in the paintings [default: False]
 
 """
 
@@ -21,7 +22,8 @@ import pickle
 from src.Museum import Museum
 from src.Measures import Measures
 from docopt import docopt
-import cv2
+import cv2,sys
+import numpy as np
 
 def main():
     #read arguments
@@ -34,6 +36,7 @@ def main():
     remove_bg_flag = args['--removeBG'][0]
     gt_flag = args['--GT']
     max_paintings = int(args['--max_paintings'])
+    read_text = args['--read_text']
     
     print("Query directory path: ", save_results_path)
     print("DB .pkl file path ", db_pickle_path)
@@ -47,6 +50,7 @@ def main():
       
     ##GENERATE QUERY RESULTS
     predicted_top_K_results = []    #list containing in each position a K-element list of the predictions for that query
+    text_boxes_list = []
     avg_precision = 0
     avg_recall = 0
     avg_F1_score = 0
@@ -59,9 +63,6 @@ def main():
       if remove_bg_flag != "False":
         current_query.mask = current_query.remove_background(method=remove_bg_flag)  #remove background and save the masks into the given path
         
-        #postprocess mask to improve the results
-        #current_query.postprocess_mask()
-
         #save mask into inputted path
         cv2.imwrite(str(save_results_path+str(current_query.id).zfill(5)+".png"), current_query.mask)
 
@@ -89,12 +90,31 @@ def main():
       
       #for each painting in the query image, obtain the descriptor
       print("Found ", len(paintings), "painting(s)")
+      text_coordinates_query = []
       for painting in paintings:
         print("Computing descriptor of painting")
         painting.compute_descriptor(museum.config)
-        #detect text
-        #painting.detect_text()
+        #if there's more than one painting, crop the region of the current one to feed it to the text detection module instead of sending the whole image
+        if remove_bg_flag!="False" and read_text=="True":
+          white_pixels = np.array(np.where(painting.mask == 1))
+          white_pixels = np.sort(white_pixels)
+          #get coordinates of the first and last white pixels (useful to set a mask bounding box)
+          first_white_pixel = white_pixels[:,0]
+          last_white_pixel = white_pixels[:,-1]
+          img = painting.read_image_BGR()
+          
+          img_cropped = img[first_white_pixel[0]:last_white_pixel[0],first_white_pixel[1]:last_white_pixel[1]]
+          #cv2.imwrite(str("test.png"), img_cropped)
+        elif read_text=="True":
+          img_cropped = painting.read_image_BGR()
+        if read_text=="True":
+          #detect text
+          pass
+          #text_coordinates = painting.detect_text(img = img_cropped)
+          #text_coordinates_query.append(text_coordinates)
 
+      #if read_text=="True":
+      # text_boxes_list.append(text_coordinates_query)
       predicted_top_K_results.append(museum.retrieve_top_K_results(paintings,K,distance_string = distance_arg, max_paintings = max_paintings))
         
     if(gt_flag=='True'):
@@ -116,6 +136,9 @@ def main():
     #save list of lists into pkl file
     with open(str(save_results_path+"result.pkl"), 'wb') as f:
         pickle.dump(predicted_top_K_results, f)
+    if read_text=='True':
+      with open(str(save_results_path+"text_boxes.pkl"), 'wb') as f:
+          pickle.dump(text_boxes_list, f)
 
 if __name__ == "__main__":
     main()
