@@ -3,6 +3,7 @@ import os
 import pickle
 from src.Image import Image
 from src.Measures import Measures
+from pathlib import Path
 
 class Museum:
     def __init__(self, query_set_directory: str, db_pickle_path:str,gt_flag:str) -> None:
@@ -11,6 +12,8 @@ class Museum:
         #if there's ground truth, store it
         if(gt_flag=='True'):
             self.query_gt = self.read_pickle(self.query_set_directory + '/gt_corresps.pkl')
+            if Path(self.query_set_directory +'/text_boxes.pkl').is_file():
+                self.text_boxes_gt = self.read_pickle(self.query_set_directory +'/text_boxes.pkl')
         else:
             self.query_gt=[]
 
@@ -47,7 +50,7 @@ class Museum:
                 file_directory = os.path.join(directory, file)
                 filename_without_extension = file.split(".")[0]
                 filename_id =  int(filename_without_extension.split("_")[-1])
-                images.append(Image(file_directory,filename_id, museum_config))
+                images.append(Image(file_directory,filename_id))
                 
         return images
 
@@ -75,7 +78,7 @@ class Museum:
 
         return distance
 
-    def retrieve_top_K_results(self, query_image: Image, K: int, distance_string:str) -> list:
+    def retrieve_top_K_results(self, paintings: Image, K: int, distance_string:str, max_paintings : int) -> list:
         """Given an image of the query set, retrieve the top K images with the lowest distance speficied by distance_string from the dataset
                 query_image: Image to compute the distances against the BBDD
                 K: # of most similar images returned 
@@ -83,25 +86,53 @@ class Museum:
             Output: list with the ids of the K most similar images to query_image
         """
 
-        distances = []
-        ids = []
-        for BBDD_current_image in self.dataset:
-            current_distance = self.compute_distances(BBDD_current_image, query_image,distance_string )
-            current_id = BBDD_current_image.id
+        if max_paintings == 1:
+            distances = []
+            ids = []
             
-            distances.append(current_distance)
-            ids.append(current_id)
+            for BBDD_current_image in self.dataset:
+                current_distance = self.compute_distances(BBDD_current_image, paintings[0],distance_string )
+                current_id = BBDD_current_image.id
+                
+                distances.append(current_distance)
+                ids.append(current_id)
 
-        list_distance_ids = list(zip(distances, ids))
+            list_distance_ids = list(zip(distances, ids))
 
-        #sort ascending to descending if the highest score means the bigger the similarity
-        if(distance_string=="HIST_INTERSECTION" or distance_string =="HELLINGER_KERNEL"):
-            list_distance_ids.sort(reverse = True)
+            #sort ascending to descending if the highest score means the bigger the similarity
+            if(distance_string=="HIST_INTERSECTION" or distance_string =="HELLINGER_KERNEL"):
+                list_distance_ids.sort(reverse = True)
+            else:
+            #sort descending to ascending if the smallest distance  means the bigger the similarity
+                list_distance_ids.sort()
+            
+            ids_sorted = [ids for distances, ids in list_distance_ids]
+            
+            return ids_sorted[:K]
+
         else:
-        #sort descending to ascending if the smallest distance  means the bigger the similarity
-            list_distance_ids.sort()
-        ids_sorted = [ids for distances, ids in list_distance_ids]
-        return ids_sorted[:K]
+            ids_sorted_list = []
+            for query_painting in paintings:
+                distances = []
+                ids = []
+                for BBDD_current_image in self.dataset:
+                    current_distance = self.compute_distances(BBDD_current_image, query_painting,distance_string )
+                    current_id = BBDD_current_image.id
+                    distances.append(current_distance)
+                    ids.append(current_id)
+
+                list_distance_ids = list(zip(distances, ids))
+
+                #sort ascending to descending if the highest score means the bigger the similarity
+                if(distance_string=="HIST_INTERSECTION" or distance_string =="HELLINGER_KERNEL"):
+                    list_distance_ids.sort(reverse = True)
+                else:
+                #sort descending to ascending if the smallest distance  means the bigger the similarity
+                    list_distance_ids.sort()
+                
+                ids_sorted = [ids for distances, ids in list_distance_ids]
+                ids_sorted_list.append(ids_sorted[:K])
+            return ids_sorted_list
 
     def compute_MAP_at_k(self, actual, predicted, k: int = 3):
         """

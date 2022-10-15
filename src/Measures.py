@@ -1,4 +1,5 @@
 import numpy as np
+from evaluation.evaluation_funcs import performance_accumulation_pixel, performance_evaluation_pixel
 
 class Measures:
   
@@ -90,14 +91,29 @@ class Measures:
         return score / min(len(actual), k)
     
     @staticmethod
-    def compute_precision(actual_list: list, predicted_list: list) -> float:
-        pass
-    
+    def compute_TP_FP_FN_TN(mask, mask_gt) -> float:
+        """Given two masks, it computes the precision, recall and f1 score between them
+            mask: predicted mask
+            mask_gt: ground truth mask
+        """
+
+        if mask.shape!=mask_gt.shape:
+            #mask is rotated
+            mask = np.reshape(mask, (mask.shape[1], mask.shape[0]))
+        #obtain TP,FP,FN,TN values
+        [pixelTP, pixelFP, pixelFN, pixelTN] = performance_accumulation_pixel(mask,mask_gt)
+  
+
+        return pixelTP,pixelFP,pixelFN, pixelTN
+
     @staticmethod
-    def compute_recall() -> float:
-        pass
-    
-    @staticmethod
-    def compute_F1() -> float:
-        pass
-    
+    def compute_precision_recall_F1(pixelTP, pixelFP, pixelFN, pixelTN):
+        [pixel_precision, pixel_accuracy, pixel_specificity, pixel_recall] = performance_evaluation_pixel(pixelTP, pixelFP, pixelFN, pixelTN)
+        #if condition to avoid 0 division if both metrics are 0
+        if(pixel_precision==0 or pixel_recall==0):
+            pixel_F1_score = 0
+        else:
+            #compute F1 score
+            pixel_F1_score = 2*float(pixel_precision) *float(pixel_recall)/ float(pixel_recall+pixel_precision)
+        
+        return pixel_precision,pixel_recall,pixel_F1_score

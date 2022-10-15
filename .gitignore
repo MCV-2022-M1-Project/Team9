@@ -1,7 +1,9 @@
 #Filenames
 result.pkl
 database.pkl
+score_painting_retrieval.py
 
 env/
 __pycache__/
 week1/*
+week2/*
