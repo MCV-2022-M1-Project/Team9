@@ -3,6 +3,7 @@ import os
 import pickle
 from src.Image import Image
 from src.Measures import Measures
+from pathlib import Path
 
 class Museum:
     def __init__(self, query_set_directory: str, db_pickle_path:str,gt_flag:str) -> None:
@@ -11,6 +12,8 @@ class Museum:
         #if there's ground truth, store it
         if(gt_flag=='True'):
             self.query_gt = self.read_pickle(self.query_set_directory + '/gt_corresps.pkl')
+            if Path(self.query_set_directory +'/text_boxes.pkl').is_file():
+                self.text_boxes_gt = self.read_pickle(self.query_set_directory +'/text_boxes.pkl')
         else:
             self.query_gt=[]
 
@@ -104,6 +107,7 @@ class Museum:
                 list_distance_ids.sort()
             
             ids_sorted = [ids for distances, ids in list_distance_ids]
+            
             return ids_sorted[:K]
 
         else:

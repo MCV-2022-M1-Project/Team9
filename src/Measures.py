@@ -91,37 +91,29 @@ class Measures:
         return score / min(len(actual), k)
     
     @staticmethod
-    def compute_mask_metrics(mask, mask_gt) -> float:
+    def compute_TP_FP_FN_TN(mask, mask_gt) -> float:
         """Given two masks, it computes the precision, recall and f1 score between them
             mask: predicted mask
             mask_gt: ground truth mask
         """
 
         if mask.shape!=mask_gt.shape:
-            print("IN")
-            print()
-            print()
-            print()
-            print()
-            print()
-            print()
-            print()
             #mask is rotated
             mask = np.reshape(mask, (mask.shape[1], mask.shape[0]))
         #obtain TP,FP,FN,TN values
         [pixelTP, pixelFP, pixelFN, pixelTN] = performance_accumulation_pixel(mask,mask_gt)
-        #obtain precision and recall
+  
+
+        return pixelTP,pixelFP,pixelFN, pixelTN
+
+    @staticmethod
+    def compute_precision_recall_F1(pixelTP, pixelFP, pixelFN, pixelTN):
         [pixel_precision, pixel_accuracy, pixel_specificity, pixel_recall] = performance_evaluation_pixel(pixelTP, pixelFP, pixelFN, pixelTN)
-        
         #if condition to avoid 0 division if both metrics are 0
         if(pixel_precision==0 or pixel_recall==0):
             pixel_F1_score = 0
         else:
             #compute F1 score
             pixel_F1_score = 2*float(pixel_precision) *float(pixel_recall)/ float(pixel_recall+pixel_precision)
-        print("PRECISION: ", pixel_precision)
-        print("RECALL: ", pixel_recall)
-        print("F1 SCORE: ", pixel_F1_score)
-
-        return pixel_precision, pixel_recall, pixel_F1_score
-    
+        
+        return pixel_precision,pixel_recall,pixel_F1_score

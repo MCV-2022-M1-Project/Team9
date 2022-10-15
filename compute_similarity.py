@@ -20,6 +20,7 @@ Options:
 
 import pickle
 from src.Museum import Museum
+from src.Image import Image
 from src.Measures import Measures
 from docopt import docopt
 import cv2,sys
@@ -51,9 +52,10 @@ def main():
     ##GENERATE QUERY RESULTS
     predicted_top_K_results = []    #list containing in each position a K-element list of the predictions for that query
     text_boxes_list = []
-    avg_precision = 0
-    avg_recall = 0
-    avg_F1_score = 0
+    total_TP = 0
+    total_FP = 0
+    total_TN = 0
+    total_FN = 0
     number_of_queries_mask_evaluation = 0
     print("Computing distances with DB images...")
     
@@ -72,13 +74,13 @@ def main():
           #load gt mask
           mask_gt_path = str(current_query.file_directory.split(".jpg")[0]+".png")
           mask_gt = cv2.imread(mask_gt_path,0)
-          #compute the fscore, precision and recall
-          pixel_precision, pixel_recall, pixel_F1_score = Measures.compute_mask_metrics(mask = current_query.mask, mask_gt = mask_gt)
-          #add scores of each query to the average
-          avg_F1_score = avg_F1_score + pixel_F1_score
-          avg_recall= avg_recall + pixel_recall
-          avg_precision = avg_precision + pixel_precision
-          number_of_queries_mask_evaluation = number_of_queries_mask_evaluation+1
+          #compute the TP,TN,...
+          pixelTP,pixelFP,pixelFN,pixelTN= Measures.compute_TP_FP_FN_TN(mask = current_query.mask, mask_gt = mask_gt)
+          #add pixels of each query to the total
+          total_TP =total_TP+ pixelTP
+          total_FP=total_FP+ pixelFP
+          total_TN =total_TN+ pixelTN
+          total_FN=total_FN+pixelFN
 
         print("Query: ", current_query.file_directory)
 
@@ -90,48 +92,75 @@ def main():
       
       #for each painting in the query image, obtain the descriptor
       print("Found ", len(paintings), "painting(s)")
-      text_coordinates_query = []
+
+      text_coordinates_query = [] #array to store all the text coordinates of a single query (there may be multiple paintings per query)
       for painting in paintings:
+
+        if read_text=="True":
+          top_left_coordinate_offset = [0,0]
+          #if there's more than one painting, crop the region of the current one to feed it to the text detection module instead of sending the whole image
+          if remove_bg_flag!="False":
+            img_cropped, top_left_coordinate_offset = painting.crop_image_with_mask_bbox()
+          #else send the entire image
+          else:
+            img_cropped = painting.read_image_BGR()
+        
+          cv2.imwrite(str("test.png"), img_cropped)
+          #detect text
+          [tlx1, tly1, brx1, bry1] = Image.detect_text(img = img_cropped)
+          tlx1=tlx1+top_left_coordinate_offset[1]
+          brx1=brx1+top_left_coordinate_offset[1]
+
+          tly1=tly1+top_left_coordinate_offset[0]
+          brx1=brx1+top_left_coordinate_offset[0]
+
+          text_coordinates = [tlx1, tly1, brx1, bry1]
+          text_coordinates_query.append(text_coordinates)
+
         print("Computing descriptor of painting")
         painting.compute_descriptor(museum.config)
-        #if there's more than one painting, crop the region of the current one to feed it to the text detection module instead of sending the whole image
-        if remove_bg_flag!="False" and read_text=="True":
-          white_pixels = np.array(np.where(painting.mask == 1))
-          white_pixels = np.sort(white_pixels)
-          #get coordinates of the first and last white pixels (useful to set a mask bounding box)
-          first_white_pixel = white_pixels[:,0]
-          last_white_pixel = white_pixels[:,-1]
-          img = painting.read_image_BGR()
-          
-          img_cropped = img[first_white_pixel[0]:last_white_pixel[0],first_white_pixel[1]:last_white_pixel[1]]
-          #cv2.imwrite(str("test.png"), img_cropped)
-        elif read_text=="True":
-          img_cropped = painting.read_image_BGR()
-        if read_text=="True":
-          #detect text
+      #append it to global list
+      if read_text=="True":
+        text_boxes_list.append(text_coordinates_query)
+        #compute IoU if there's ground truth
+        if gt_flag=="True":
           pass
-          #text_coordinates = painting.detect_text(img = img_cropped)
-          #text_coordinates_query.append(text_coordinates)
-
-      #if read_text=="True":
-      # text_boxes_list.append(text_coordinates_query)
+      #compute top k results
       predicted_top_K_results.append(museum.retrieve_top_K_results(paintings,K,distance_string = distance_arg, max_paintings = max_paintings))
         
     if(gt_flag=='True'):
       #compute mapk score if there's ground truth
-      mapk_score = museum.compute_MAP_at_k(museum.query_gt, predicted_top_K_results, K)
+      if(max_paintings==1):
+        mapk_score = museum.compute_MAP_at_k(museum.query_gt, predicted_top_K_results, K)
+      else:
+        mapk_average = 0
+        query_num = 0
+        paintings_num = 0
+        for query in museum.query_gt:
+          i = 0
+          for painting in query:
+            #mapk = 0 if we didnt predict the painting
+            if len(predicted_top_K_results[query_num])-1<i:
+              continue
+            mapk_average = mapk_average+museum.compute_MAP_at_k([[painting]], [predicted_top_K_results[query_num][i]], K)
+            i = i+1
+            paintings_num = paintings_num+1
+          
+          query_num = query_num+1
+        mapk_score = mapk_average/paintings_num
+
       print("Ground truth: ",museum.query_gt)
       print("Predictions: ",predicted_top_K_results)
       print("MAPK score: ",mapk_score)
 
       #compute precision, recall and F1 score of masks if removeBG was activated
       if remove_bg_flag!= "False":
-        avg_F1_score = float(avg_F1_score)/float(number_of_queries_mask_evaluation)
-        avg_recall = float(avg_recall)/float(number_of_queries_mask_evaluation)
-        avg_precision = float(avg_precision)/float(number_of_queries_mask_evaluation)
-        print("Average precision: ", str(avg_precision))
-        print("Average recall: ", str(avg_recall))
-        print("Average F1 score: ", str(avg_F1_score))
+        #obtain precision and recall
+        pixel_precision,pixel_recall,pixel_F1_score =Measures.compute_precision_recall_F1(total_TP, total_FP, total_FN, total_TN)
+            
+        print("Average precision: ", str(pixel_precision))
+        print("Average recall: ", str(pixel_recall))
+        print("Average F1 score: ", str(pixel_F1_score))
         
     #save list of lists into pkl file
     with open(str(save_results_path+"result.pkl"), 'wb') as f:

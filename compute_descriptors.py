@@ -1,7 +1,7 @@
 """
 Generate descriptors of the database
 Usage:
-  compute_descriptors.py <inputDir> [--DBpicklePath=<dbppath] [--histogramType=<histType>] [--nbins=<nbins>] [--descriptorType=<dtype>]
+  compute_descriptors.py <inputDir> [--DBpicklePath=<dbppath] [--histogramType=<histType>] [--nbins=<nbins>] [--descriptorType=<dtype>] [--level=<lv>] [--max_level=<mlv>]
   compute_descriptors.py -h | --help
   -
   <inputDir>                Directory with database data 
@@ -11,7 +11,9 @@ Options:
   --DBpicklePath=<dbppath>    Filename/path to save the pkl database generated with compute_descriptors.py [default: database.pkl]
   --histogramType=<histType>  Type of histogram used to generate the descriptors (GRAYSCALE, BGR, HSV, YCRCB, LAB)  [default: GRAYSCALE]
   --nbins=<nbins>             Number of bins of the histograms [default: 16]
-  --descriptorType=<dtype>    Type of descriptor (1Dhistogram) [default: 1Dhistogram]
+  --descriptorType=<dtype>    Type of descriptor (1Dhistogram,mult_res_histogram) [default: 1Dhistogram]
+  --level=<lv>                WIP [default: 4]
+  --max_level=<mlv>           WIP [default: 2]
 """
 
 import pickle
@@ -29,11 +31,15 @@ def main():
     if descriptor_type =="1Dhistogram":
       nbins = int(args['--nbins'])              # # of bins of the histogram DB 
       histogram_type = args['--histogramType']   
-
-    #save descriptor configuration 
-    #CASE: descriptor = 1D histogram (the only implementation so far)
-    if(descriptor_type == "1Dhistogram"):
       museum_config ={"descriptorType":descriptor_type, "histogramType": histogram_type ,"nbins": nbins} #empty dictionary with config info
+
+
+    elif descriptor_type =="mult_res_histogram":
+      nbins = int(args['--nbins'])              # # of bins of the histogram DB 
+      histogram_type = args['--histogramType'] 
+      level = int(args['--level'])
+      max_level = int(args['--max_level'])
+      museum_config ={"descriptorType":descriptor_type, "histogramType": histogram_type ,"nbins": nbins, "level": level, "max_level": max_level} #empty dictionary with config info
 
     #print configuration
     print("Descriptor settings: ")
@@ -51,7 +57,8 @@ def main():
       image_object.compute_descriptor(museum_config)
 
     #read relationships file
-    db_relationships = Museum.read_pickle(dataset_directory + '/relationships.pkl')
+    #db_relationships = Museum.read_pickle(dataset_directory + '/relationships.pkl')
+    db_relationships = []
     #save list of lists into pkl file
     #first field contains the image objects containing the descriptor information, second field contains relationships.pkl file and the last field contains the configuration of the descriptors
     with open(db_pickle_path, 'wb') as f:
