@@ -21,10 +21,13 @@ Options:
 import pickle
 from src.Museum import Museum
 from src.Image import Image
+from src.TextDetection import TextDetection
+from evaluation.bbox_iou import bbox_iou
 from src.Measures import Measures
 from docopt import docopt
 import cv2,sys
 import numpy as np
+
 
 def main():
     #read arguments
@@ -56,6 +59,7 @@ def main():
     total_FP = 0
     total_TN = 0
     total_FN = 0
+    IoU_average = 0
     number_of_queries_mask_evaluation = 0
     print("Computing distances with DB images...")
     
@@ -107,41 +111,85 @@ def main():
         
           cv2.imwrite(str("test.png"), img_cropped)
           #detect text
-          [tlx1, tly1, brx1, bry1] = Image.detect_text(img = img_cropped)
+          [tlx1, tly1, brx1, bry1], text_mask= TextDetection.detect_text(img = img_cropped)
+          if remove_bg_flag!="False":
+            text_mask = cv2.copyMakeBorder( text_mask,  top_left_coordinate_offset[0], painting.mask.shape[0]-text_mask.shape[0]-top_left_coordinate_offset[0], top_left_coordinate_offset[1], painting.mask.shape[1]-text_mask.shape[1]-top_left_coordinate_offset[1], cv2.BORDER_CONSTANT, None, value = 255)
+          else:
+            painting.mask = np.ones((painting.read_image_BGR().shape[0],painting.read_image_BGR().shape[1]))
+          text_mask = text_mask.astype(np.uint8)
+          painting.mask = painting.mask.astype(np.uint8)
+          cv2.imwrite(str("test4.png"), text_mask)
+          
+          painting.mask = cv2.bitwise_and(painting.mask, text_mask)
+          
+          cv2.imwrite(str("test4b.png"), painting.mask )
           tlx1=tlx1+top_left_coordinate_offset[1]
           brx1=brx1+top_left_coordinate_offset[1]
 
           tly1=tly1+top_left_coordinate_offset[0]
-          brx1=brx1+top_left_coordinate_offset[0]
+          bry1=bry1+top_left_coordinate_offset[0]
 
           text_coordinates = [tlx1, tly1, brx1, bry1]
-          text_coordinates_query.append(text_coordinates)
+          bounding_box_im = cv2.rectangle(painting.read_image_BGR(), (tlx1,tly1), (brx1,bry1), (0,0,0), -1)
+          
+          cv2.imwrite(str("test4.png"), bounding_box_im )
+          painting.text_coordinates = text_coordinates
 
+          text_coordinates_query.append(text_coordinates)
         print("Computing descriptor of painting")
         painting.compute_descriptor(museum.config)
       #append it to global list
       if read_text=="True":
         text_boxes_list.append(text_coordinates_query)
-        #compute IoU if there's ground truth
-        if gt_flag=="True":
-          pass
+        
       #compute top k results
       predicted_top_K_results.append(museum.retrieve_top_K_results(paintings,K,distance_string = distance_arg, max_paintings = max_paintings))
         
     if(gt_flag=='True'):
       #compute mapk score if there's ground truth
-      if(max_paintings==1):
+      """if(max_paintings==1):
         mapk_score = museum.compute_MAP_at_k(museum.query_gt, predicted_top_K_results, K)
-      else:
+        paintings_num = 0
+        query_num = 0
+      
+        for query in museum.query_gt:
+          i = 0
+          for painting in query:
+            #compute IoU if there's ground truth
+            if read_text=="True":
+              print("QUERY NUM", query_num)
+              print("i", i)
+              print("TB LIST i", text_boxes_list[query_num][i])
+              print("TB LIST i", museum.text_boxes_gt[query_num][i])
+              museum.text_boxes_gt= museum.text_boxes_gt
+              IoU = bbox_iou(museum.text_boxes_gt[query_num][i], text_boxes_list[query_num][i])
+              IoU_average = IoU_average+IoU
+            i = i+1
+            paintings_num = paintings_num+1
+          query_num = query_num+1
+          """
+      if True:
         mapk_average = 0
         query_num = 0
         paintings_num = 0
+        IoU_total = 0
         for query in museum.query_gt:
           i = 0
           for painting in query:
             #mapk = 0 if we didnt predict the painting
             if len(predicted_top_K_results[query_num])-1<i:
+              
+              paintings_num = paintings_num+1
               continue
+              
+            #compute IoU if there's ground truth
+            if read_text=="True":
+              
+              IoU = bbox_iou(museum.text_boxes_gt[query_num][i], text_boxes_list[query_num][i])
+              print("IoU", IoU)
+              IoU_average = IoU_average+IoU
+              if IoU!= 0:
+                IoU_total = IoU_total+1
             mapk_average = mapk_average+museum.compute_MAP_at_k([[painting]], [predicted_top_K_results[query_num][i]], K)
             i = i+1
             paintings_num = paintings_num+1
@@ -153,6 +201,7 @@ def main():
       print("Predictions: ",predicted_top_K_results)
       print("MAPK score: ",mapk_score)
 
+
       #compute precision, recall and F1 score of masks if removeBG was activated
       if remove_bg_flag!= "False":
         #obtain precision and recall
@@ -161,11 +210,15 @@ def main():
         print("Average precision: ", str(pixel_precision))
         print("Average recall: ", str(pixel_recall))
         print("Average F1 score: ", str(pixel_F1_score))
+      if read_text == "True":
+        IoU_average = IoU_average/IoU_total
+        print("Average IoU: ", str(IoU_average))
         
     #save list of lists into pkl file
     with open(str(save_results_path+"result.pkl"), 'wb') as f:
         pickle.dump(predicted_top_K_results, f)
     if read_text=='True':
+      print("TEXT BOXES ",text_boxes_list)
       with open(str(save_results_path+"text_boxes.pkl"), 'wb') as f:
           pickle.dump(text_boxes_list, f)
 

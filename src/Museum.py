@@ -13,7 +13,24 @@ class Museum:
         if(gt_flag=='True'):
             self.query_gt = self.read_pickle(self.query_set_directory + '/gt_corresps.pkl')
             if Path(self.query_set_directory +'/text_boxes.pkl').is_file():
+                
                 self.text_boxes_gt = self.read_pickle(self.query_set_directory +'/text_boxes.pkl')
+                box_list = []
+                for box_paintings in self.text_boxes_gt:
+                    box_painting_list = []
+                    for box in box_paintings:
+                        if(type(box[0])!=int and type(box[0])!=np.int32):
+                                
+                            tl = box[0]
+                            br = box[2]
+                            box_coordinates = [tl[0], tl[1], br[0], br[1]]
+                            box_painting_list.append(box_coordinates)
+                        else:
+                            box_painting_list.append(box)
+                    box_list.append(box_painting_list)
+                self.text_boxes_gt = box_list
+                with open(str("text_boxes.pkl"), 'wb') as f:
+                    pickle.dump(box_list, f)
         else:
             self.query_gt=[]
 
@@ -86,7 +103,7 @@ class Museum:
             Output: list with the ids of the K most similar images to query_image
         """
 
-        if max_paintings == 1:
+        if max_paintings == -1:
             distances = []
             ids = []
             
