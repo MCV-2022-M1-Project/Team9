@@ -46,7 +46,6 @@ class TextDetection :
             rectanglessness = contour_area / (w * h)
             # print(rectanglessness)
             # print(contour_area)
-            # Contour area is smaller because is black and white?
             if contour_area > 1500 and contour_area < 80000:
                 if rectanglessness > 0.8:
                     new_contours.append(contour)
@@ -216,6 +215,5 @@ class TextDetection :
         tly1 = final_bounding_boxes[1]
         brx1 = final_bounding_boxes[2]
         bry1 = final_bounding_boxes[3]
-        print([tlx1, tly1, brx1, bry1])
         tlx1, tly1, brx1, bry1
         return [tlx1, tly1, brx1, bry1], bounding_box_im

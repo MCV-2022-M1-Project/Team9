@@ -47,12 +47,17 @@ class Image:
         elif descriptorType=="mult_res_histogram":
             nbins = descriptorConfig.get("nbins")
             histogramType = descriptorConfig.get("histogramType")
-            level = descriptorConfig.get("level")
             max_level = descriptorConfig.get("max_level")
             self.descriptor= self.compute_histogram(descriptorType,histogramType, nbins,max_level= max_level)
+            
+        elif descriptorType=="block_histogram":
+            nbins = descriptorConfig.get("nbins")
+            histogramType = descriptorConfig.get("histogramType")
+            level = descriptorConfig.get("level")
+            self.descriptor= self.compute_histogram(descriptorType,histogramType, nbins,level= level)
+    
 
-
-    def compute_histogram(self,descriptor_type:str, histogram_type:str, nbins:int,max_level=None):
+    def compute_histogram(self,descriptor_type:str, histogram_type:str, nbins:int,max_level=None, level = None):
         """Computes the histogram of a given image. The histogram type (grayscale, concatenated histograms,...) can be selected with histogram_type
             histogram_type: if GRAYSCALE is selected it will compute the 1d grayscale histogram. If histogram_type contains "HSV", "BGR", "YCBCR" or "LAB" it will
                 compute the concatenated HSV/BGR/YCBCR/LAB histogram
@@ -69,6 +74,9 @@ class Image:
                 histogram = Histograms.compute_histogram_3channel(BGR_image,nbins, histogram_type, mask=self.mask)
         elif descriptor_type=="mult_res_histogram":
             histogram = Histograms.compute_spatial_pyramid_representation(image=BGR_image, mask=self.mask, color_space=histogram_type, nbins=nbins, max_level=max_level)
+        elif descriptor_type=="block_histogram":
+            histogram = Histograms.compute_block_based_histogram(image=BGR_image, mask=self.mask, color_space=histogram_type, nbins=nbins, level=level)
+    
         #normalise histogram to not take into account the amount of pixels/how big the picture is into the similarity comparison
         norm_histogram = histogram/sum(histogram)
         #cast to float64 just in case

@@ -32,9 +32,13 @@ class BackgroundRemoval:
 
         #obtain gradient of grayscale image
         gradient = cv2.morphologyEx(img, cv2.MORPH_GRADIENT, gradient_kernel)
+        
+        cv2.imwrite("GRADIENT.png",gradient)
         #binarise gradient
         temp, gradient_binary = cv2.threshold(gradient,30,255,cv2.THRESH_BINARY)
         mask = gradient_binary[:,:,0]
+        
+        cv2.imwrite("BIN_GRADIENT.png",mask)
 
         #add zero padding for morphology tasks 
         padding = 1500
@@ -45,7 +49,11 @@ class BackgroundRemoval:
         
         #really wide closing in horizontal and vertical directions
         temp1 = mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close_vert)
+        
+        cv2.imwrite("VERT_STRUCTURING.png",BackgroundRemoval.crop_img(temp1 ,padding,padding,padding,padding))
         temp2 = mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close_hor)
+        
+        cv2.imwrite("HOR_STRUCTURING.png", BackgroundRemoval.crop_img(temp2 ,padding,padding,padding,padding))
 
         #the mask will be the intersection
         mask = cv2.bitwise_and(temp1, temp2)
@@ -55,6 +63,7 @@ class BackgroundRemoval:
         mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close2)
         mask = BackgroundRemoval.crop_img(mask ,padding,padding,padding,padding)
 
+        cv2.imwrite("FINAL.png", mask)
         mask = mask.astype(np.uint8)
         return mask
 

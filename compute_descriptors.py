@@ -12,8 +12,8 @@ Options:
   --histogramType=<histType>  Type of histogram used to generate the descriptors (GRAYSCALE, BGR, HSV, YCRCB, LAB)  [default: GRAYSCALE]
   --nbins=<nbins>             Number of bins of the histograms [default: 16]
   --descriptorType=<dtype>    Type of descriptor (1Dhistogram,mult_res_histogram) [default: 1Dhistogram]
-  --level=<lv>                WIP [default: 4]
-  --max_level=<mlv>           WIP [default: 2]
+  --level=<lv>                Levels of block histogram [default: 4]
+  --max_level=<mlv>           Levels of multiresolution histogram [default: 2]
 """
 
 import pickle
@@ -37,9 +37,14 @@ def main():
     elif descriptor_type =="mult_res_histogram":
       nbins = int(args['--nbins'])              # # of bins of the histogram DB 
       histogram_type = args['--histogramType'] 
-      level = int(args['--level'])
       max_level = int(args['--max_level'])
-      museum_config ={"descriptorType":descriptor_type, "histogramType": histogram_type ,"nbins": nbins, "level": level, "max_level": max_level} #empty dictionary with config info
+      museum_config ={"descriptorType":descriptor_type, "histogramType": histogram_type ,"nbins": nbins, "max_level": max_level} #empty dictionary with config info
+    
+    elif descriptor_type =="block_histogram":
+      nbins = int(args['--nbins'])              # # of bins of the histogram DB 
+      histogram_type = args['--histogramType'] 
+      level = int(args['--level'])
+      museum_config ={"descriptorType":descriptor_type, "histogramType": histogram_type ,"nbins": nbins, "level": level} #empty dictionary with config info
 
     #print configuration
     print("Descriptor settings: ")

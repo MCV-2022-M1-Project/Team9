@@ -147,27 +147,6 @@ def main():
         
     if(gt_flag=='True'):
       #compute mapk score if there's ground truth
-      """if(max_paintings==1):
-        mapk_score = museum.compute_MAP_at_k(museum.query_gt, predicted_top_K_results, K)
-        paintings_num = 0
-        query_num = 0
-      
-        for query in museum.query_gt:
-          i = 0
-          for painting in query:
-            #compute IoU if there's ground truth
-            if read_text=="True":
-              print("QUERY NUM", query_num)
-              print("i", i)
-              print("TB LIST i", text_boxes_list[query_num][i])
-              print("TB LIST i", museum.text_boxes_gt[query_num][i])
-              museum.text_boxes_gt= museum.text_boxes_gt
-              IoU = bbox_iou(museum.text_boxes_gt[query_num][i], text_boxes_list[query_num][i])
-              IoU_average = IoU_average+IoU
-            i = i+1
-            paintings_num = paintings_num+1
-          query_num = query_num+1
-          """
       if True:
         mapk_average = 0
         query_num = 0
@@ -213,6 +192,8 @@ def main():
       if read_text == "True":
         IoU_average = IoU_average/IoU_total
         print("Average IoU: ", str(IoU_average))
+        print("Paintings num",paintings_num )
+        print("Average IoU (All): ", str(IoU_average/paintings_num))
         
     #save list of lists into pkl file
     with open(str(save_results_path+"result.pkl"), 'wb') as f:
