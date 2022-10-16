@@ -16,7 +16,7 @@ class BackgroundRemoval:
         img_greyscale = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         #define kernels
-        kernel_size_close = 30
+        kernel_size_close = 20
         kernel_size_close2 = 100
         kernel_size_remove = 1500
         kernel_size_open = 70
