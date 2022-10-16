@@ -60,7 +60,7 @@ class TextDetection :
         # sys.exit()    
         return new_contours
 
-    def get_text_bounding_box(im, im_gray, im_hsv, get_negative=False, morph_open=3, laplacian_kernel_center_weight=4, debug=False):
+    def get_text_bounding_box(im, im_gray, im_hsv, get_negative=False, morph_open=3, extra_open=0, laplacian_kernel_center_weight=4, debug=False):
         # We save pixels that are not saturated on the image to remove the saturated later. We do that because the text bounding boxes are somewhat black and white
         pixels_saturated = abs((im_hsv[:,:,1] > 60) - 1)
         
@@ -79,6 +79,8 @@ class TextDetection :
         laplacian_image = cv2.filter2D(src=abs(src), ddepth=-1, kernel=laplacian_kernel)
         laplacian_image = cv2.morphologyEx(laplacian_image, cv2.MORPH_CLOSE, np.ones((3,3),np.uint8))
         laplacian_image = cv2.morphologyEx(laplacian_image, cv2.MORPH_OPEN, np.ones((morph_open,morph_open),np.uint8))
+        if extra_open != 0:
+            laplacian_image = cv2.morphologyEx(laplacian_image, cv2.MORPH_OPEN, np.ones((extra_open,extra_open),np.uint8))
         # laplacian_image = cv2.morphologyEx(laplacian_image, cv2.MORPH_CLOSE, np.ones((7,7),np.uint8))
         # laplacian_image = cv2.morphologyEx(laplacian_image, cv2.MORPH_CLOSE, np.ones((3,3),np.uint8))
         # Threshold low "gradients"
@@ -94,10 +96,11 @@ class TextDetection :
             epsilon = 0.04*cv2.arcLength(contour,True)
             approx = cv2.approxPolyDP(contour,epsilon,True)
             contour_area = cv2.contourArea(contour)
-            if contour_area > 1400 and contour_area < 80000:
+            if contour_area > 2000 and contour_area < 80000:
                 x, y, w, h = cv2.boundingRect(contour)
+                aspect_ratio = w/h
                 rectanglessness = contour_area / (w * h)
-                if rectanglessness > 0.8:
+                if rectanglessness > 0.8 and aspect_ratio > 2.5:
                     new_contours.append(contour)
                 # else:
                 #     mask_contours = mask_from_contours(im_hsv, contour)
@@ -118,8 +121,9 @@ class TextDetection :
         return new_contours
                 
 
-    laplacian_kernel_center_weights = [4,8,10,12,16]
+    laplacian_kernel_center_weights = [4,8,6,10,12,16]
     morph_opens = [3, 12]
+    extra_opens = [0, 3, 12]
 
     # From https://pyimagesearch.com/2016/03/21/ordering-coordinates-clockwise-with-python-and-opencv/
     def order_points_old(pts):
@@ -143,12 +147,13 @@ class TextDetection :
         return rect
 
     def detect_text(img):
-    #for file in glob.glob('./Datasets/qsd2_w2/*.jpg'):
+        #for file in glob.glob('./Datasets/qsd2_w2/*.jpg'):
         # file = './Datasets/qsd2_w2/00015.jpg'
         im = img
         
-        laplacian_kernel_center_weights = [4,8,10,12,16]
+        laplacian_kernel_center_weights = [4,8,6,10,12,16]
         morph_opens = [3, 12]
+        extra_opens = [0, 3, 12]
         orig_im = im
         
         bounding_boxes = []
@@ -160,18 +165,20 @@ class TextDetection :
         
         for weight in laplacian_kernel_center_weights:
             for morph_open in morph_opens:
-                bounding_box = TextDetection.get_text_bounding_box(im, im_gray, im_hsv, get_negative=False, morph_open=morph_open, laplacian_kernel_center_weight=weight, debug=False)
-
-                for box in bounding_box:
-                    rot_rect = cv2.minAreaRect(box)
-                    box_points = cv2.boxPoints(rot_rect).astype(np.uint16)
-                    bounding_box_im = cv2.rectangle(bounding_box_im, (box_points[0][0],box_points[0][1]), (box_points[2][0],box_points[2][1]), (0,0,0), -1)
-                    
-                bounding_box = TextDetection.get_text_bounding_box(im, im_gray, im_hsv, get_negative=True, morph_open=morph_open, laplacian_kernel_center_weight=weight, debug=False)
-                for box in bounding_box:
-                    rot_rect = cv2.minAreaRect(box)
-                    box_points = cv2.boxPoints(rot_rect).astype(np.uint16)
-                    bounding_box_im = cv2.rectangle(bounding_box_im, (box_points[0][0],box_points[0][1]), (box_points[2][0],box_points[2][1]), (0,0,0), -1)
+                for extra_open in extra_opens:
+                    bounding_box = TextDetection.get_text_bounding_box(im, im_gray, im_hsv, get_negative=False, morph_open=morph_open,
+                                                        extra_open=extra_open, laplacian_kernel_center_weight=weight, debug=False)
+                    for box in bounding_box:
+                        rot_rect = cv2.minAreaRect(box)
+                        box_points = cv2.boxPoints(rot_rect).astype(np.uint16)
+                        bounding_box_im = cv2.rectangle(bounding_box_im, (box_points[0][0],box_points[0][1]), (box_points[2][0],box_points[2][1]), (0,0,0), -1)
+                        
+                    bounding_box = TextDetection.get_text_bounding_box(im, im_gray, im_hsv, get_negative=True, morph_open=morph_open,
+                                                        extra_open=extra_open, laplacian_kernel_center_weight=weight, debug=False)
+                    for box in bounding_box:
+                        rot_rect = cv2.minAreaRect(box)
+                        box_points = cv2.boxPoints(rot_rect).astype(np.uint16)
+                        bounding_box_im = cv2.rectangle(bounding_box_im, (box_points[0][0],box_points[0][1]), (box_points[2][0],box_points[2][1]), (0,0,0), -1)
         
         # Get bounding boxes for test
         final_bounding_boxes = []
