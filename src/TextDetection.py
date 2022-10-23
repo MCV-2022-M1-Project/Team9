@@ -197,10 +197,8 @@ class TextDetection :
             # print(box_points)
             
             final_bounding_boxes.append([ordered_box[0][0], ordered_box[0][1], ordered_box[2][0], ordered_box[2][1]])
-        final_bounding_boxes
-        cv2.imwrite('./'+"test2"+'.jpg', orig_im)
+
         bounding_box_im = bounding_box_im*255
-        cv2.imwrite('./'+"test3"+'.png', bounding_box_im)
         # plt.imshow(bounding_box_im, cmap='gray')
         # plt.show()
         
@@ -217,3 +215,6 @@ class TextDetection :
         bry1 = final_bounding_boxes[3]
         tlx1, tly1, brx1, bry1
         return [tlx1, tly1, brx1, bry1], bounding_box_im
+    
+    def read_text(img):
+        pass
