@@ -92,7 +92,7 @@ class Measures:
     
     @staticmethod
     def compute_TP_FP_FN_TN(mask, mask_gt) -> float:
-        """Given two masks, it computes the precision, recall and f1 score between them
+        """Given two masks, it computes the true positives, false positives, false negatives and true negatives of their values
             mask: predicted mask
             mask_gt: ground truth mask
         """
@@ -108,6 +108,12 @@ class Measures:
 
     @staticmethod
     def compute_precision_recall_F1(pixelTP, pixelFP, pixelFN, pixelTN):
+        """Given the amount of TP, FP, FN and TN, it computes the precision, recall and Fscore of them
+            pixelTP: # of true positives
+            pixelFP: # of false positives
+            pixelTP: # of false negatives
+            pixelTN: # of true negatives
+        """
         [pixel_precision, pixel_accuracy, pixel_specificity, pixel_recall] = performance_evaluation_pixel(pixelTP, pixelFP, pixelFN, pixelTN)
         #if condition to avoid 0 division if both metrics are 0
         if(pixel_precision==0 or pixel_recall==0):

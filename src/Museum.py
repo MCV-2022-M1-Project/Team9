@@ -13,7 +13,6 @@ class Museum:
         if(gt_flag=='True'):
             self.query_gt = self.read_pickle(self.query_set_directory + '/gt_corresps.pkl')
             if Path(self.query_set_directory +'/text_boxes.pkl').is_file():
-                
                 self.text_boxes_gt = self.read_pickle(self.query_set_directory +'/text_boxes.pkl')
                 box_list = []
                 for box_paintings in self.text_boxes_gt:
@@ -29,8 +28,10 @@ class Museum:
                             box_painting_list.append(box)
                     box_list.append(box_painting_list)
                 self.text_boxes_gt = box_list
-                with open(str("text_boxes.pkl"), 'wb') as f:
-                    pickle.dump(box_list, f)
+                #with open(str("text_boxes.pkl"), 'wb') as f:
+                #    pickle.dump(box_list, f)
+            if Path(self.query_set_directory +'/augmentations.pkl').is_file():
+                self.augmentations_gt = self.read_pickle(self.query_set_directory +'/augmentations.pkl')
         else:
             self.query_gt=[]
 
@@ -40,9 +41,10 @@ class Museum:
             self.dataset = database_data[0] #load image objects containing the id and descriptors
             self.relationships = database_data[1] #load DB relationships
             self.config = database_data[2]  #load config info of how the descriptors have been generated
+            self.dict_artists_paintings = database_data[3]
             f.close()
         print("Reading query images")
-        self.query_set = self.read_images(self.query_set_directory, self.config)
+        self.query_set, _ = self.read_images(self.query_set_directory, is_query = True)
         
     @staticmethod
     def read_pickle(file_path):
@@ -55,21 +57,45 @@ class Museum:
         
         return content  
     @staticmethod
-    def read_images( directory: str, museum_config:dict) -> list:        
+    def read_images( directory: str, is_query=False) -> list:        
         """
         Given a directory and the descriptor configuration, it creates an image object with those variables
             directory: Directory where the target images in
             distance_string: Contains the label of the distance that will be used to compute it
         """
         images = []
+        dict_artists_paintings = {} #dictionary containing all the artists and their paintings as values
+        artist = None
+        title = None
         for file in os.listdir(directory):
             if file.endswith(".jpg"): 
                 file_directory = os.path.join(directory, file)
                 filename_without_extension = file.split(".")[0]
+                filename_path_without_extension = file_directory.rsplit('.',1)[0]
                 filename_id =  int(filename_without_extension.split("_")[-1])
-                images.append(Image(file_directory,filename_id))
+
+                if Path(str(filename_path_without_extension+'.txt')).is_file() and not is_query:
+                #read .txt file containing title/artist info
+                    with open(str(filename_path_without_extension+'.txt'), encoding = "ISO-8859-1") as f:
+                        lines = f.readlines()
+                        lines = lines[0]
+                        f.close()
+
+                    #replace with unknown if it doesnt have any information in the txt file
+                    if lines == "\n":
+                        lines = "('Unknown', 'Unknown')\n"
+                        
+                    artist = lines.split("'")[1]
+                    title = lines.split("'")[3]
+
+                    #store it so that the key is the artist and each value is [title of the painting, image_id]
+                    if artist in dict_artists_paintings.keys():
+                        dict_artists_paintings[artist]+=[ filename_id]
+                    else:
+                        dict_artists_paintings[artist] = [filename_id]
+                images.append(Image(file_directory,filename_id, artist = artist, title = title))
                 
-        return images
+        return images, dict_artists_paintings
 
     def compute_distances(self,image1: Image, image2: Image, distance_string: str = "L2") -> float:
         """
@@ -78,24 +104,23 @@ class Museum:
             distance_string: Contains the label of the distance that will be used to compute it
         """
 
-        histogram1 = image1.descriptor
-        histogram2 = image2.descriptor
-        
+        feature_vector1 = image1.descriptor
+        feature_vector2 = image2.descriptor
 
         if distance_string == "L2":
-            distance = Measures.compute_euclidean_distance(histogram1, histogram2)
+            distance = Measures.compute_euclidean_distance(feature_vector1, feature_vector2)
         elif distance_string =="L1":
-            distance = Measures.compute_L1_distance(histogram1, histogram2)
+            distance = Measures.compute_L1_distance(feature_vector1, feature_vector2)
         elif distance_string == "X2":
-            distance = Measures.compute_x2_distance(histogram1, histogram2)
+            distance = Measures.compute_x2_distance(feature_vector1, feature_vector2)
         elif distance_string == "HIST_INTERSECTION":
-            distance = Measures.compute_histogram_intersection(histogram1, histogram2)
+            distance = Measures.compute_histogram_intersection(feature_vector1, feature_vector2)
         elif distance_string == "HELLINGER_KERNEL":
-            distance = Measures.compute_hellinger_kernel(histogram1, histogram2)
+            distance = Measures.compute_hellinger_kernel(feature_vector1, feature_vector2)
 
         return distance
 
-    def retrieve_top_K_results(self, paintings: Image, K: int, distance_string:str, max_paintings : int) -> list:
+    def retrieve_top_K_results(self, paintings: Image, K: int, distance_string:str, max_paintings : int, text_string_list:str = None) -> list:
         """Given an image of the query set, retrieve the top K images with the lowest distance speficied by distance_string from the dataset
                 query_image: Image to compute the distances against the BBDD
                 K: # of most similar images returned 
@@ -103,14 +128,14 @@ class Museum:
             Output: list with the ids of the K most similar images to query_image
         """
 
-        if max_paintings == -1:
+
+        ids_sorted_list = []
+        for idx_painting, query_painting in enumerate(paintings):
             distances = []
             ids = []
-            
             for BBDD_current_image in self.dataset:
-                current_distance = self.compute_distances(BBDD_current_image, paintings[0],distance_string )
+                current_distance = self.compute_distances(BBDD_current_image, query_painting,distance_string )
                 current_id = BBDD_current_image.id
-                
                 distances.append(current_distance)
                 ids.append(current_id)
 
@@ -124,32 +149,50 @@ class Museum:
                 list_distance_ids.sort()
             
             ids_sorted = [ids for distances, ids in list_distance_ids]
-            
-            return ids_sorted[:K]
 
-        else:
-            ids_sorted_list = []
-            for query_painting in paintings:
-                distances = []
-                ids = []
-                for BBDD_current_image in self.dataset:
-                    current_distance = self.compute_distances(BBDD_current_image, query_painting,distance_string )
-                    current_id = BBDD_current_image.id
-                    distances.append(current_distance)
-                    ids.append(current_id)
-
-                list_distance_ids = list(zip(distances, ids))
-
-                #sort ascending to descending if the highest score means the bigger the similarity
-                if(distance_string=="HIST_INTERSECTION" or distance_string =="HELLINGER_KERNEL"):
-                    list_distance_ids.sort(reverse = True)
+            #if improving the results with text is enabled
+            if text_string_list is not None:
+                if (K<10):
+                    ids_sorted = ids_sorted[:10] #get top 10 results
                 else:
-                #sort descending to ascending if the smallest distance  means the bigger the similarity
-                    list_distance_ids.sort()
-                
-                ids_sorted = [ids for distances, ids in list_distance_ids]
-                ids_sorted_list.append(ids_sorted[:K])
-            return ids_sorted_list
+                    ids_sorted = ids_sorted[:K]
+
+                curr_artist_prediction = text_string_list[idx_painting]
+                #ignore if prediction is empty
+                if curr_artist_prediction != "":
+                    print("NOT IGNORED, CURR PREDICTION  ", curr_artist_prediction)
+                    import textdistance
+                    #if theres an artist with that key in the db dictionary, use it
+                    if curr_artist_prediction in self.dict_artists_paintings.keys():
+                        print("FOUND")
+                        possible_paintings_db = self.dict_artists_paintings[curr_artist_prediction]
+                    else:
+                        min_dist = -1
+                        closest_artist_key = None
+                        for artist in self.dict_artists_paintings:
+                            lev_dist = textdistance.levenshtein.distance(artist,curr_artist_prediction)
+                            if lev_dist<min_dist or min_dist == -1:
+                                min_dist=lev_dist
+                                closest_artist_key = artist
+
+                        print("CLOSEST PREDICTION IN DB", closest_artist_key, "PREDICTION ", curr_artist_prediction)
+                        possible_paintings_db = self.dict_artists_paintings[closest_artist_key]
+                    print("POSSIBLE PAINTINGS ", possible_paintings_db)
+                    print("K BEFORE ", ids_sorted)
+                    found = False
+                    for k_idx, predicted_painting_id in enumerate(ids_sorted):
+                        if predicted_painting_id in possible_paintings_db:
+                            found = True
+                            #shift list to the right 1 position and add text prediction in the first one
+                            _ = ids_sorted.pop()
+                            ids_sorted.insert(0, predicted_painting_id)
+                            break
+                    if not found:
+                        _ = ids_sorted.pop()
+                        ids_sorted.insert(0, possible_paintings_db[0])
+                    print("K AFTER ", ids_sorted)
+            ids_sorted_list.append(ids_sorted[:K])
+        return ids_sorted_list
 
     def compute_MAP_at_k(self, actual, predicted, k: int = 3):
         """

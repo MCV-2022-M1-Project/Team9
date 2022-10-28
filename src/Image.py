@@ -3,17 +3,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 import skimage
 from src.Histograms import Histograms
+from src.TextureDescriptors import TextureDescriptors
 from src.BackgroundRemoval import BackgroundRemoval
 import math
 
 class Image:
-    def __init__(self, file_directory: str, id:int) -> None:
+    def __init__(self, file_directory: str, id:int, artist:str=None, title:str=None) -> None:
         self.file_directory = file_directory    
         self.id = id    #numerical id of the image in str format
         self.mask = []  #initialise mask as empty, if the mask is [] it will be ignored. In cases where background will be removed, this mask will get updated with the foreground estimate mask
         #image information is not saved into image objects (ironically). If the image information is needed, it can be read with file_directory (image path). This is to avoid storing all images into the DB and only use images when needed
         self.image_filename = file_directory.split("/")[-1]
 
+        #if available, store the artist and title of the painting
+        self.artist = artist
+        self.title = title
 
     def read_image_BGR(self) -> np.ndarray:
         return cv2.imread(self.file_directory, cv2.IMREAD_COLOR)
@@ -29,43 +33,61 @@ class Image:
         plt.plot(self.histogram_rgb_image)
         plt.show()
     
-    def compute_descriptor(self, descriptorConfig:dict):
+    def compute_descriptor(self, image, descriptor_config_array:dict, cropped_img = None):
         """
         Given the descriptor configuration, it computes it and stores it into the descriptor property
-            descriptorConfig: dictionary containing information on how to generate the descriptor
+            descriptor_config_array: array of dictionaries containing information on how to generate the descriptor
         """
-        #generate descriptor
-        descriptorType = descriptorConfig.get("descriptorType")
+        concatenated_descriptors = []
 
-        #if it's a 1D histogram
-        if descriptorType=="1Dhistogram":
-            nbins = descriptorConfig.get("nbins")
-            histogramType = descriptorConfig.get("histogramType")
-            self.descriptor= self.compute_histogram(descriptorType,histogramType, nbins)
-
-        #multiresolution histogram
-        elif descriptorType=="mult_res_histogram":
-            nbins = descriptorConfig.get("nbins")
-            histogramType = descriptorConfig.get("histogramType")
-            max_level = descriptorConfig.get("max_level")
-            self.descriptor= self.compute_histogram(descriptorType,histogramType, nbins,max_level= max_level)
+        #cropped_img is used for the texture descriptors in case the image has been cropped to separate it from the background. if it's empty, the entire image will be used
+        if len(self.mask)==0:
+            cropped_img = image
             
-        elif descriptorType=="block_histogram":
-            nbins = descriptorConfig.get("nbins")
-            histogramType = descriptorConfig.get("histogramType")
-            level = descriptorConfig.get("level")
-            self.descriptor= self.compute_histogram(descriptorType,histogramType, nbins,level= level)
-    
+        for descriptor_config in descriptor_config_array: 
+            #generate descriptor
+            descriptorType = descriptor_config.get("descriptorType")
 
-    def compute_histogram(self,descriptor_type:str, histogram_type:str, nbins:int,max_level=None, level = None):
+            #if it's a 1D histogram
+            if descriptorType=="1Dhistogram":
+                nbins = descriptor_config.get("nbins")
+                histogramType = descriptor_config.get("histogramType")
+                descriptor= self.compute_histogram(image,descriptorType,histogramType, nbins)
+
+            #multiresolution histogram
+            elif descriptorType=="mult_res_histogram":
+                nbins = descriptor_config.get("nbins")
+                histogramType = descriptor_config.get("histogramType")
+                max_level = descriptor_config.get("max_level")
+                descriptor= self.compute_histogram(image,descriptorType,histogramType, nbins,max_level= max_level)
+            
+            #block histogram
+            elif descriptorType=="block_histogram":
+                nbins = descriptor_config.get("nbins")
+                histogramType = descriptor_config.get("histogramType")
+                level = descriptor_config.get("level")
+                descriptor= self.compute_histogram(image,descriptorType,histogramType, nbins,level= level)
+
+            #hog histogram
+            elif descriptorType=="HOG":
+                descriptor= TextureDescriptors.compute_HOG(cropped_img)
+
+            #lbp histogram
+            elif descriptorType=="LBP":
+                lbp_radius = descriptor_config.get("lbp_radius")
+                descriptor= TextureDescriptors.compute_LBP_histogram(self.convert_image_grey_scale(cropped_img), radius = lbp_radius)
+            
+            concatenated_descriptors = np.concatenate([descriptor,concatenated_descriptors])
+        self.descriptor = concatenated_descriptors
+
+    def compute_histogram(self,BGR_image, descriptor_type:str, histogram_type:str, nbins:int,max_level=None, level = None):
         """Computes the histogram of a given image. The histogram type (grayscale, concatenated histograms,...) can be selected with histogram_type
             histogram_type: if GRAYSCALE is selected it will compute the 1d grayscale histogram. If histogram_type contains "HSV", "BGR", "YCBCR" or "LAB" it will
                 compute the concatenated HSV/BGR/YCBCR/LAB histogram
             nbins: # of bins of the resultant histogram
-
+            descriptor_type: type of descriptor (1D histogram, multi resolution histogram, ...)
+            histogram_type: colour space of the histogram
         """
-        #read image
-        BGR_image =self.read_image_BGR()
         if descriptor_type =="1Dhistogram":
             if histogram_type=="GRAYSCALE":
                 histogram = Histograms.compute_histogram_grey_scale(BGR_image, nbins,mask = self.mask)
@@ -83,29 +105,31 @@ class Image:
         norm_histogram = np.float64(norm_histogram)
         return norm_histogram
 
-    def remove_background(self, method:str):
+    def remove_background(self, image,method:str):
         """Removes the background of the image and saves it in a path. If computeGT is set to True, it will also compute the precision/recall of the mas compared to the GT
             method: method used to remove the background
         """
-        im = cv2.imread(self.file_directory)
 
         #remove background using otsu
         if method =="OTSU":
             print("Removing background with OTSU")
-            mask = BackgroundRemoval.remove_background_otsu(im = im)
+            mask = BackgroundRemoval.remove_background_otsu(im = image)
         #remove background using colour thresholds
         elif(method =="LAB" or method=="HSV"):
-            mask = BackgroundRemoval.remove_background_color(im = im, colorspace=method)
+            mask = BackgroundRemoval.remove_background_color(im = image, colorspace=method)
         elif(method=="MORPHOLOGY"):
-            im = cv2.medianBlur(im,5)
-            mask = BackgroundRemoval.remove_background_morph(img=im)
+            im = cv2.medianBlur(image,5)
+            mask = BackgroundRemoval.remove_background_morph(img=image)
 
         return mask
 
 
 
-    ### GIVEN A MASK, COUNT PAINTINGS
     def count_paintings(self, max_paintings: int):
+        """Counts how many connected components are in the image and returns a list where each position is an Image object with the mask information of the corresponding
+        connected component
+        
+        """
         self.mask = self.mask.astype(np.uint8)
         #count mask connected components
         nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(self.mask, connectivity=8)
@@ -128,7 +152,7 @@ class Image:
             #if necessary, obtain the most possible mask
             paintings = paintings[:max_paintings]
         if len(paintings)>1:
-            #sort them from left to right (temporary, only case ==2 )
+            #sort them from left to right (only case ==2 )
 
             white_pixels1 = np.array(np.where(paintings[0].mask == 255))
             white_pixels1 = np.sort(white_pixels1)
@@ -147,26 +171,27 @@ class Image:
 
         return paintings
     
-    def crop_image_with_mask_bbox(self):
+    def crop_image_with_mask_bbox(self, img):
+        """Crops an image with the shape of the bounding box of its mask
+            img: image to crop
+        """
         white_pixels = np.array(np.where(self.mask == 255))
         white_pixels = np.sort(white_pixels)
         #get coordinates of the first and last white pixels (useful to set a mask bounding box)
         first_white_pixel = white_pixels[:,0]
         last_white_pixel = white_pixels[:,-1]
-        img = self.read_image_BGR()
         #crop image with np slicing
         img_cropped = img[first_white_pixel[0]:last_white_pixel[0],first_white_pixel[1]:last_white_pixel[1]]
         return img_cropped,first_white_pixel
-    
-    ##move to another .py file if possible
-    def detect_text(img):
-        ##fill with proper code
 
-        ####
-        
-        #return the bbox coordinates (TODO)
-        tlx1 = 0   #top left
-        tly1 = 0   #top right
-        brx1 = 1   #bottom left
-        bry1 = 1   #bottom right
-        return [tlx1, tly1, brx1, bry1]
+    def denoise(self, img):
+        """Checks if an image has to be denoised and denoises it if it's the case
+            img: target image that may have noise
+        """
+
+        #TEMPORARY!!
+        is_noisy = True
+        denoised_image = img
+
+
+        return denoised_image, is_noisy

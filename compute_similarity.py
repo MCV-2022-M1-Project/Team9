@@ -1,21 +1,21 @@
 """
 Generate similarity results given a query folder
 Usage:
-  compute_similarity.py <queryDir> [--distance=<dist>] [--K=<k>] [--saveResultsPath=<ppath>] [--DBpicklePath=<dbppath>] [--removeBG=<bg>] [--GT=<gt>] [--max_paintings=<mp>] [--read_text=<rt>]
+  compute_similarity.py <queryDir> [--distance=<dist>] [--K=<k>] [--save_results_path=<ppath>] [--db_pickle_path=<dbppath>] [--remove_bg=<bg>] [--GT=<gt>] [--max_paintings=<mp>] [--read_text=<rt>] [--text_as_descriptor=<td>]
   compute_similarity.py -h | --help
   -
-  <inputDir>                Directory with database data 
   <queryDir>                Directory with query data
 Options:
-  --distance=<dist>         Distance to compute image similarity (L1, L2, X2, HIST_INTERSECTION, HELLINGER_KERNEL) [default: X2]
-  --K=<k>                   Number of similar results to output [default: 3]
-  --saveResultsPath=<ppath>      Filename/path to save the pkl results file (masks will be saved into the same dir if --removeBG==True) [default: ./]
-  --DBpicklePath=<dbppath>  Filename/path to load the pkl database generated with compute_descriptors.py [default: ./database.pkl]
-  --removeBG=<bg>           Whether or not to remove the background of the query images. If the value is different than False, it will remove the background using the specified technique (False, MORPHOLOGY, HSV, LAB, OTSU) [default: False]
-  --GT=<gt>                 Whether or not there's ground truth available (True/False) [default: True]
-  --max_paintings=<mp>      Max paintings per image [default: 1]
-  --read_text=<rt>          Whether or not there is text to read in the paintings [default: False]
-
+  --distance=<dist>             Distance to compute image similarity (L1, L2, X2, HIST_INTERSECTION, HELLINGER_KERNEL) [default: X2]
+  --K=<k>                       Number of similar results to output [default: 3]
+  --save_results_path=<ppath>   Filename/path to save the pkl results file (masks will be saved into the same dir if --remove_bg==True) [default: ./]
+  --db_pickle_path=<dbppath>    Filename/path to load the pkl database generated with compute_descriptors.py [default: ./database.pkl]
+  --remove_bg=<bg>              Whether or not to remove the background of the query images. If the value is different than False, it will remove the background using the specified technique (False, MORPHOLOGY, HSV, LAB, OTSU) [default: False]
+  --GT=<gt>                     Whether or not there's ground truth available (True/False) [default: True]
+  --max_paintings=<mp>          Max paintings per image [default: 1]
+  --read_text=<rt>              Whether or not there is text to read in the paintings [default: False]
+  --text_as_descriptor=<tad>    Whether or not the text will be used to improve the k results [default: False]
+  
 """
 
 import pickle
@@ -28,6 +28,8 @@ from docopt import docopt
 import cv2,sys
 import numpy as np
 
+from pathlib import Path
+
 
 def main():
     #read arguments
@@ -35,12 +37,13 @@ def main():
     query_set_directory = args['<queryDir>']
     distance_arg = args['--distance']
     K = int(args['--K'])
-    save_results_path = args['--saveResultsPath']
-    db_pickle_path = args['--DBpicklePath']
-    remove_bg_flag = args['--removeBG'][0]
+    save_results_path = args['--save_results_path']
+    db_pickle_path = args['--db_pickle_path']
+    remove_bg_flag = args['--remove_bg'][0]
     gt_flag = args['--GT']
     max_paintings = int(args['--max_paintings'])
     read_text = args['--read_text']
+    text_as_descriptor = args['--text_as_descriptor']
     
     print("Query directory path: ", save_results_path)
     print("DB .pkl file path ", db_pickle_path)
@@ -54,20 +57,48 @@ def main():
       
     ##GENERATE QUERY RESULTS
     predicted_top_K_results = []    #list containing in each position a K-element list of the predictions for that query
-    text_boxes_list = []
+    text_boxes_list = []  #list containing the bbox coordinates of the predicted text boxes
+    text_predictions = [] #list containing the text predictions 
+    #mask measurements
     total_TP = 0
     total_FP = 0
     total_TN = 0
     total_FN = 0
+    #whether noise gets detected properly or not measurements
+    total_noisedetect_TP = 0
+    total_noisedetect_FP = 0
+    total_noisedetect_TN = 0
+    total_noisedetect_FN = 0
+
+    img_cropped = None
     IoU_average = 0
     number_of_queries_mask_evaluation = 0
     print("Computing distances with DB images...")
-    
+
     #for each one of the queries
-    for current_query in museum.query_set:
+    for idx_query, current_query in enumerate(museum.query_set):
+
+      #denoise the image if necessary 
+      img = cv2.imread(current_query.file_directory)
+      img, is_noisy = current_query.denoise(img)
+
+      #compute tp/tn/fp/fn if there's gt of the denoising
+      if hasattr(museum, 'augmentations_gt'):
+        current_gt_augm = museum.augmentations_gt[idx_query]
+        is_noisy_gt = not "None" in current_gt_augm #==True if ground truth does not contain None (used to show it doesnt have noise)
+        if is_noisy_gt== False and is_noisy==True:
+          total_noisedetect_FP = total_noisedetect_FP+1
+        elif is_noisy_gt== True and is_noisy==True:
+          total_noisedetect_TP = total_noisedetect_TP+1
+        elif is_noisy_gt== False and is_noisy==False:
+          total_noisedetect_TN = total_noisedetect_TN+1
+        elif is_noisy_gt== True and is_noisy==False:
+          total_noisedetect_FN = total_noisedetect_FN+1
+        
+        
       #if user input specified to remove the background, remove it
       if remove_bg_flag != "False":
-        current_query.mask = current_query.remove_background(method=remove_bg_flag)  #remove background and save the masks into the given path
+        current_query.mask = current_query.remove_background(image = img, method=remove_bg_flag)  #remove background and save the masks into the given path
         
         #save mask into inputted path
         cv2.imwrite(str(save_results_path+str(current_query.id).zfill(5)+".png"), current_query.mask)
@@ -98,16 +129,17 @@ def main():
       print("Found ", len(paintings), "painting(s)")
 
       text_coordinates_query = [] #array to store all the text coordinates of a single query (there may be multiple paintings per query)
-      for painting in paintings:
+      text_predictions_query = []
+      for idx_painting, painting in enumerate(paintings):
 
         if read_text=="True":
           top_left_coordinate_offset = [0,0]
           #if there's more than one painting, crop the region of the current one to feed it to the text detection module instead of sending the whole image
           if remove_bg_flag!="False":
-            img_cropped, top_left_coordinate_offset = painting.crop_image_with_mask_bbox()
+            img_cropped, top_left_coordinate_offset = painting.crop_image_with_mask_bbox(img)
           #else send the entire image
           else:
-            img_cropped = painting.read_image_BGR()
+            img_cropped = img
         
           #detect text and get coordinates
           [tlx1, tly1, brx1, bry1], text_mask= TextDetection.detect_text(img = img_cropped)
@@ -115,7 +147,7 @@ def main():
           if remove_bg_flag!="False":
             text_mask = cv2.copyMakeBorder( text_mask,  top_left_coordinate_offset[0], painting.mask.shape[0]-text_mask.shape[0]-top_left_coordinate_offset[0], top_left_coordinate_offset[1], painting.mask.shape[1]-text_mask.shape[1]-top_left_coordinate_offset[1], cv2.BORDER_CONSTANT, None, value = 255)
           else:
-            painting.mask = np.ones((painting.read_image_BGR().shape[0],painting.read_image_BGR().shape[1]))
+            painting.mask = np.ones((img.shape[0],img.shape[1]))
           
           #cast to uint8
           text_mask = text_mask.astype(np.uint8)
@@ -131,26 +163,34 @@ def main():
           bry1=bry1+top_left_coordinate_offset[0]
 
           text_coordinates = [tlx1, tly1, brx1, bry1]
-          bounding_box_im = cv2.rectangle(painting.read_image_BGR(), (tlx1,tly1), (brx1,bry1), (0,0,0), -1)
+          bounding_box_im = cv2.rectangle(img.copy(), (tlx1,tly1), (brx1,bry1), (0,0,0), -1)
           painting.text_coordinates = text_coordinates
           
-          img = painting.read_image_BGR()
           cropped_textbox = img[tly1:bry1,tlx1:brx1]
           #if there's a textbox (something got detected), read it
           if(len(cropped_textbox)>0):
             text_string = TextDetection.read_text(cropped_textbox)
             cv2.imwrite(str("test.png"), cropped_textbox)
+          else:
+            text_string = ""
+
           #add to query list
           text_coordinates_query.append(text_coordinates)
+          text_predictions_query.append(text_string)
         print("Computing descriptor of painting")
-        painting.compute_descriptor(museum.config)
+        painting.compute_descriptor(img, museum.config,cropped_img = img_cropped)
       #append it to global list
       if read_text=="True":
         text_boxes_list.append(text_coordinates_query)
-        
-      #compute top k results
-      predicted_top_K_results.append(museum.retrieve_top_K_results(paintings,K,distance_string = distance_arg, max_paintings = max_paintings))
-        
+        text_predictions.append(text_predictions_query)
+      #send variable with text information if it is going to be used to try to improve the results
+      if text_as_descriptor == "True":
+        #compute top k results
+        predicted_top_K_results.append(museum.retrieve_top_K_results(paintings,K,distance_string = distance_arg, max_paintings = max_paintings,text_string_list = text_predictions_query))
+      else:
+        #compute top k results
+        predicted_top_K_results.append(museum.retrieve_top_K_results(paintings,K,distance_string = distance_arg, max_paintings = max_paintings,text_string_list = None))
+
     #compute mapk score if there's ground truth
     if(gt_flag=='True'):
       mapk_average = 0  #average mapk
@@ -160,6 +200,7 @@ def main():
       paintings_num = 0
       for query in museum.query_gt:
         i = 0
+        query_text_path = str(query_set_directory+str(query_num).zfill(5)+'.txt')
         for painting in query:
           #mapk = 0 if we didnt predict the painting (don't add anything to the score)
           if len(predicted_top_K_results[query_num])-1<i:
@@ -171,7 +212,8 @@ def main():
             IoU = bbox_iou(museum.text_boxes_gt[query_num][i], text_boxes_list[query_num][i])
             print("IoU", IoU)
             IoU_average = IoU_average+IoU
-          #increase counter of correct detections
+
+            #increase counter of correct detections
             if IoU!= 0:
               IoU_total = IoU_total+1
 
@@ -198,7 +240,12 @@ def main():
         IoU_average = IoU_average/IoU_total
         print("Average IoU: ", str(IoU_average))
         print("Paintings num",paintings_num )
-        
+      if hasattr(museum, 'augmentations_gt'):
+        #obtain precision and recall of the noise detection
+        pixel_precision_noise,pixel_recall_noise,pixel_F1_score_noise = Measures.compute_precision_recall_F1(total_noisedetect_TP, total_noisedetect_FP, total_noisedetect_FN, total_noisedetect_TN)
+        print("Average precision (noise detection): ", str(pixel_precision_noise))
+        print("Average recall (noise detection): ", str(pixel_recall_noise))
+        print("Average F1 score (noise detection): ", str(pixel_F1_score_noise))
     #save list of lists of predictions into pkl file
     with open(str(save_results_path+"result.pkl"), 'wb') as f:
         pickle.dump(predicted_top_K_results, f)

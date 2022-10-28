@@ -30,10 +30,6 @@ class TextDetection :
         # Kernel size should vary with mask size
         mask_im = cv2.dilate(mask_im, np.ones((20,20), np.uint8), iterations=1)
         
-        # plt.imshow(mask_im)
-        # plt.show()
-        # sys.exit()
-        
         # Find the contours of the image and if each bounding box is a rectangle or not
         contours, hierarchy = cv2.findContours(mask_im, cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE)
         new_contours = []
@@ -148,7 +144,7 @@ class TextDetection :
     def detect_text(img):
         #for file in glob.glob('./Datasets/qsd2_w2/*.jpg'):
         # file = './Datasets/qsd2_w2/00015.jpg'
-        im = img
+        im = img.copy()
         
         laplacian_kernel_center_weights = [4,8,6,10,12,16]
         morph_opens = [3, 12]
@@ -213,8 +209,13 @@ class TextDetection :
         tly1 = final_bounding_boxes[1]
         brx1 = final_bounding_boxes[2]
         bry1 = final_bounding_boxes[3]
-        tlx1, tly1, brx1, bry1
         return [tlx1, tly1, brx1, bry1], bounding_box_im
     
-    def read_text(img):
-        pass
+    def read_text(textbox_img):
+        """Given an image containing a text box, returns the string of the text read in it using ocr
+            textbox_img: image that ideally contains a textbox. The bounding box used to obtain this image is the one detected with detect_text
+        """
+
+        #RETURNS TEMPORARY STRING UNTIL THIS PART IS DONE
+        return "Per Krohag"
+        
