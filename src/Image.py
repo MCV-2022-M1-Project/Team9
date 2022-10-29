@@ -43,7 +43,7 @@ class Image:
         #cropped_img is used for the texture descriptors in case the image has been cropped to separate it from the background. if it's empty, the entire image will be used
         if len(self.mask)==0:
             cropped_img = image
-            
+
         for descriptor_config in descriptor_config_array: 
             #generate descriptor
             descriptorType = descriptor_config.get("descriptorType")
@@ -78,6 +78,7 @@ class Image:
                 descriptor= TextureDescriptors.compute_LBP_histogram(self.convert_image_grey_scale(cropped_img), radius = lbp_radius)
             
             concatenated_descriptors = np.concatenate([descriptor,concatenated_descriptors])
+            #print("CONC SHAPE ", concatenated_descriptors.shape)
         self.descriptor = concatenated_descriptors
 
     def compute_histogram(self,BGR_image, descriptor_type:str, histogram_type:str, nbins:int,max_level=None, level = None):
@@ -116,8 +117,10 @@ class Image:
             mask = BackgroundRemoval.remove_background_otsu(im = image)
         #remove background using colour thresholds
         elif(method =="LAB" or method=="HSV"):
+            print("Removing background with ", method)
             mask = BackgroundRemoval.remove_background_color(im = image, colorspace=method)
         elif(method=="MORPHOLOGY"):
+            print("Removing background using CONTOURS+MORPHOLOGY")
             im = cv2.medianBlur(image,5)
             mask = BackgroundRemoval.remove_background_morph(img=image)
 

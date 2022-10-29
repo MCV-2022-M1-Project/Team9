@@ -2,70 +2,9 @@ import cv2
 
 import matplotlib.pyplot as plt
 import numpy as np
-
 import src.Image
 
 class BackgroundRemoval:
-    @staticmethod
-    def remove_background_morph(img):
-        """
-            Given an image, the gradient of its grayscale version is computed (edges of the image) and they are expanded with morphological operations
-        
-        """
-        
-        img_greyscale = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-        #define kernels
-        kernel_size_close = 20
-        kernel_size_close2 = 100
-        kernel_size_remove = 1500
-        kernel_size_open = 70
-        
-        
-        gradient_kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(5,5))
-        kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_close,kernel_size_close))
-        kernel_close2 = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_close2,kernel_size_close2))
-        kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_open,kernel_size_open))
-        
-        kernel_close_vert = cv2.getStructuringElement(cv2.MORPH_RECT,(2,kernel_size_remove))
-        kernel_close_hor = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_remove,2))
-
-        #obtain gradient of grayscale image
-        gradient = cv2.morphologyEx(img, cv2.MORPH_GRADIENT, gradient_kernel)
-        
-        cv2.imwrite("GRADIENT.png",gradient)
-        #binarise gradient
-        temp, gradient_binary = cv2.threshold(gradient,30,255,cv2.THRESH_BINARY)
-        mask = gradient_binary[:,:,0]
-        
-        cv2.imwrite("BIN_GRADIENT.png",mask)
-
-        #add zero padding for morphology tasks 
-        padding = 1500
-        mask = cv2.copyMakeBorder( mask,  padding, padding, padding, padding, cv2.BORDER_CONSTANT, None, value = 0)
-        
-        #slight closing to increase edge size
-        mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close)
-        
-        #really wide closing in horizontal and vertical directions
-        temp1 = mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close_vert)
-        
-        cv2.imwrite("VERT_STRUCTURING.png",BackgroundRemoval.crop_img(temp1 ,padding,padding,padding,padding))
-        temp2 = mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close_hor)
-        
-        cv2.imwrite("HOR_STRUCTURING.png", BackgroundRemoval.crop_img(temp2 ,padding,padding,padding,padding))
-
-        #the mask will be the intersection
-        mask = cv2.bitwise_and(temp1, temp2)
-        
-        #small opening and closing
-        mask = mask =cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel_open)
-        mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close2)
-        mask = BackgroundRemoval.crop_img(mask ,padding,padding,padding,padding)
-
-        cv2.imwrite("FINAL.png", mask)
-        mask = mask.astype(np.uint8)
-        return mask
 
     @staticmethod
     def remove_background_color( im, colorspace='HSV', debug=False):
@@ -165,11 +104,7 @@ class BackgroundRemoval:
                     
                 max_i = most_prob_region[-1]
                 
-                # print(channels[channel]['hist_threshold'])
-                # print(channels[channel]['bins'])
                 channels[channel]['range'] = [channels[channel]['bins'][min_i], channels[channel]['bins'][max_i]]
-                # channels[channel]['range'] = [channels[channel]['bins'][min_i], 255]
-                # print(channels[channel]['range'])
         
         # Remove boundaries
         # Add custom threshold because histogram does not take into account last values
@@ -178,18 +113,11 @@ class BackgroundRemoval:
             [channels['channel_1']['range'][0]-weights[0], channels['channel_2']['range'][0]-weights[1], channels['channel_3']['range'][0]-weights[2]],
             [channels['channel_1']['range'][1] +weights[0], channels['channel_2']['range'][1] + weights[1]/2, channels['channel_3']['range'][1] + weights[2]/2]
         )]
-        # boundaries = [(
-        #     [128, 0, 0],
-        #     [255, 255, 255]
-        # )]
 
         for (lower, upper) in boundaries:
             lower = np.array(lower, dtype="int16")
             upper = np.array(upper, dtype="int16")
             mask = 255 - cv2.inRange(image_transformed, lower, upper)
-            # print(mask)
-            # plt.imshow(mask,cmap='gray')
-            # plt.show()
         
         # If debug option is true, show mask and normalized histogram values
         if debug == True:
@@ -208,7 +136,10 @@ class BackgroundRemoval:
     
     @staticmethod
     def remove_background_otsu(im):
+        """
+            Given an image, computes a mask containing the foreground using otsu thresholding and morphological operations
 
+        """
         im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
         kernel = np.ones((100,100),np.uint8)
         blur = cv2.GaussianBlur(im,(5,5),0)
@@ -225,7 +156,77 @@ class BackgroundRemoval:
         return im_binary
 
     @staticmethod
-    def remove_background_otsu_old( im):
+    def remove_background_morph(img):
+        """
+            Given an image, the gradient of its grayscale version is computed (edges of the image) and they are expanded with morphological operations
+        
+        """
+        img_greyscale = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        #define kernel sizes and kernels
+        kernel_size_close = 20
+        kernel_size_close2 = 20
+        kernel_size_open = 20
+        
+        gradient_kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(5,5))
+        kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_close,kernel_size_close))
+        kernel_close2 = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_close2,kernel_size_close2))
+        kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_open,kernel_size_open))
+
+        #obtain gradient of grayscale image
+        gradient = cv2.morphologyEx(img, cv2.MORPH_GRADIENT, gradient_kernel)
+    
+        #binarise gradient
+        temp, gradient_binary = cv2.threshold(gradient,30,255,cv2.THRESH_BINARY)
+        mask = gradient_binary[:,:,0]
+        
+
+        #add zero padding for morphology tasks 
+        padding = 50
+        mask = cv2.copyMakeBorder( mask,  padding, padding, padding, padding, cv2.BORDER_CONSTANT, None, value = 0)
+        
+        #slight closing to increase edge size
+        mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close)
+        
+        #flood image starting from edge (result will have white background)
+        _,mask_flooded,_,_ = cv2.floodFill(mask.copy(), None, (0, 0), 255)
+        #get area of interest
+        mask = mask_flooded-mask
+
+        #small opening and closing
+        
+        mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close2)
+        mask = mask =cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel_open)
+        mask = BackgroundRemoval.crop_img(mask ,padding,padding,padding,padding)
+
+        #invert it (background -> 0, foreground-> 255)
+        mask = 255-mask.astype(np.uint8)
+
+        #remove connected components under a specific size
+        nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
+        sizes = stats[1:, -1]; nb_components = nb_components - 1
+        heights = stats[1:,3]
+        widths = stats[1:,2]
+        paintings = []
+        height, width,_ = img.shape
+        fraction = 5
+        min_height= height/fraction
+        min_width = width/fraction
+
+        #set maximum on how many components to check in case there's too many
+        max_components = min(nb_components,10)
+        temp_mask = np.zeros((output.shape))
+        #for each connected component
+        for i in range(0, max_components):
+            #write it into resultant mask if its big enough
+            if(heights[i]>min_height and widths[i]>min_width):
+                temp_mask[output == i + 1] = 255
+        mask = temp_mask
+
+        return mask
+
+    @staticmethod
+    def remove_background_otsu_2( im):
         """
             Given an image, a threshold is found using otsu and the resulting mask of the binarisation is outputted
             im: BGR image to remove the background from
@@ -265,13 +266,65 @@ class BackgroundRemoval:
                 image = image[:1, :1]
                 
             return image
-        
-            # im_merged = cv2.bitwise_and(im, im, mask=im_binary)
-            # im_cropped = crop_background(im_merged)
-            
             
         return im_binary*255
 
+    @staticmethod
+    def remove_background_morph_old(img):
+        """
+            Given an image, the gradient of its grayscale version is computed (edges of the image) and they are expanded with morphological operations
+        
+        """
+        
+        img_greyscale = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        #define kernels
+        kernel_size_close = 20
+        kernel_size_close2 = 100
+        kernel_size_remove = 1500
+        kernel_size_open = 70
+        
+        
+        gradient_kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(5,5))
+        kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_close,kernel_size_close))
+        kernel_close2 = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_close2,kernel_size_close2))
+        kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_open,kernel_size_open))
+        
+        kernel_close_vert = cv2.getStructuringElement(cv2.MORPH_RECT,(2,kernel_size_remove))
+        kernel_close_hor = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_remove,2))
+
+        #obtain gradient of grayscale image
+        gradient = cv2.morphologyEx(img, cv2.MORPH_GRADIENT, gradient_kernel)
+        
+        #binarise gradient
+        temp, gradient_binary = cv2.threshold(gradient,30,255,cv2.THRESH_BINARY)
+        mask = gradient_binary[:,:,0]
+        
+
+        #add zero padding for morphology tasks 
+        padding = 1500
+        mask = cv2.copyMakeBorder( mask,  padding, padding, padding, padding, cv2.BORDER_CONSTANT, None, value = 0)
+        
+        #slight closing to increase edge size
+        mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close)
+        
+        #really wide closing in horizontal and vertical directions
+        temp1 = mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close_vert)
+        
+        temp2 = mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close_hor)
+
+        #the mask will be the intersection
+        mask = cv2.bitwise_and(temp1, temp2)
+        
+        #small opening and closing
+        mask = mask =cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel_open)
+        mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close2)
+        mask = BackgroundRemoval.crop_img(mask ,padding,padding,padding,padding)
+
+        mask = mask.astype(np.uint8)
+
+        return mask
+        
     @staticmethod 
     def crop_img(image_array,top,bottom,left,right):
         """ Cuts off the specified amount of pixels of an image
