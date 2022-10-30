@@ -82,11 +82,7 @@ class Image:
                 
                 block_size = descriptor_config.get("dct_block_size")
                 #print("block_size",block_size)
-                descriptor = TextureDescriptors.compute_DCT_histogram(cropped_img, block_size)
-            print("DESC TYPE ", type(descriptor[0]))
-            print("DESC POS 1 ", descriptor[0])
-            print("DESC LENGTH ", descriptor[0].shape)
-            print("CONC SHAPE ", type(concatenated_descriptors))
+                descriptor = TextureDescriptors.compute_DCT_histogram(self.convert_image_grey_scale(cropped_img))
             concatenated_descriptors = np.concatenate([descriptor,concatenated_descriptors])
             #print("CONC SHAPE ", concatenated_descriptors.shape)
         self.descriptor = concatenated_descriptors

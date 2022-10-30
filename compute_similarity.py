@@ -83,8 +83,8 @@ def main():
 
       #denoise the image if necessary 
       img = cv2.imread(current_query.file_directory)
-      #img, is_noisy = Denoise.remove_noise_simple(img)
-      img, is_noisy = Denoise.remove_noise_BM3D(img)
+      img, is_noisy = Denoise.remove_noise_simple(img)
+      #img, is_noisy = Denoise.remove_noise_BM3D(img)
       #compute tp/tn/fp/fn if there's gt of the denoising
       if hasattr(museum, 'augmentations_gt'):
         
