@@ -4,6 +4,7 @@ import cv2
 import matplotlib.pyplot as plt
 import sys
 import glob
+import pytesseract
 import skimage
 import os
 class TextDetection :
@@ -215,7 +216,12 @@ class TextDetection :
         """Given an image containing a text box, returns the string of the text read in it using ocr
             textbox_img: image that ideally contains a textbox. The bounding box used to obtain this image is the one detected with detect_text
         """
+        bounding_box_cropped_im =textbox_img
+        bounding_box_cropped_im_gray = cv2.cvtColor(bounding_box_cropped_im, cv2.COLOR_BGR2GRAY)
+        th, bounding_box_cropped_im_binary = cv2.threshold(bounding_box_cropped_im_gray, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
-        #RETURNS TEMPORARY STRING UNTIL THIS PART IS DONE
-        return "Per Krohag"
+        extractedInformation = pytesseract.image_to_string(bounding_box_cropped_im_binary)
+        extractedInformation = extractedInformation.replace("\n", "")
+        extractedInformation = extractedInformation.replace("", "")
+        return extractedInformation
         

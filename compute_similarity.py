@@ -24,6 +24,7 @@ from src.Image import Image
 from src.TextDetection import TextDetection
 from evaluation.bbox_iou import bbox_iou
 from src.Measures import Measures
+from src.Denoise import Denoise
 from docopt import docopt
 import cv2,sys
 import numpy as np
@@ -69,6 +70,8 @@ def main():
     total_noisedetect_FP = 0
     total_noisedetect_TN = 0
     total_noisedetect_FN = 0
+    psnr_avg = 0
+    total_noisy = 0
 
     img_cropped = None
     IoU_average = 0
@@ -80,11 +83,23 @@ def main():
 
       #denoise the image if necessary 
       img = cv2.imread(current_query.file_directory)
-      img, is_noisy = current_query.denoise(img)
-
+      #img, is_noisy = Denoise.remove_noise_simple(img)
+      img, is_noisy = Denoise.remove_noise_BM3D(img)
       #compute tp/tn/fp/fn if there's gt of the denoising
       if hasattr(museum, 'augmentations_gt'):
+        
         current_gt_augm = museum.augmentations_gt[idx_query]
+        
+        filename_path_without_extension = current_query.file_directory.rsplit('/',1)[0]
+        if is_noisy:
+          cv2.imwrite(str("test.png"), img)
+        non_augmented = cv2.imread(str(filename_path_without_extension+"/non_augmented/"+str(current_query.id).zfill(5)+".jpg"))
+        
+        #img = cv2.imread(current_query.file_directory)
+        if is_noisy:
+          psnr  = cv2.PSNR(non_augmented, img)
+          psnr_avg = psnr+psnr_avg
+          total_noisy = total_noisy+1
         is_noisy_gt = not "None" in current_gt_augm #==True if ground truth does not contain None (used to show it doesnt have noise)
         if is_noisy_gt== False and is_noisy==True:
           total_noisedetect_FP = total_noisedetect_FP+1
@@ -101,6 +116,7 @@ def main():
         current_query.mask = current_query.remove_background(image = img, method=remove_bg_flag)  #remove background and save the masks into the given path
         
         #save mask into inputted path
+        
         cv2.imwrite(str(save_results_path+str(current_query.id).zfill(5)+".png"), current_query.mask)
 
         #compute metrics if there's a ground truth
@@ -130,6 +146,7 @@ def main():
 
       text_coordinates_query = [] #array to store all the text coordinates of a single query (there may be multiple paintings per query)
       text_predictions_query = []
+
       for idx_painting, painting in enumerate(paintings):
 
         if read_text=="True":
@@ -170,7 +187,6 @@ def main():
           #if there's a textbox (something got detected), read it
           if(len(cropped_textbox)>0):
             text_string = TextDetection.read_text(cropped_textbox)
-            cv2.imwrite(str("test.png"), cropped_textbox)
           else:
             text_string = ""
 
@@ -183,6 +199,12 @@ def main():
       if read_text=="True":
         text_boxes_list.append(text_coordinates_query)
         text_predictions.append(text_predictions_query)
+        print("predicted names", text_predictions_query)
+        # open file in write mode
+        with open(str(save_results_path+str(current_query.id).zfill(5)+".txt"), 'w') as fp:
+            for prediction in text_predictions_query:
+                # write each item on a new line
+                fp.write("%s\n" % prediction)
       #send variable with text information if it is going to be used to try to improve the results
       if text_as_descriptor == "True":
         #compute top k results
@@ -246,6 +268,7 @@ def main():
         print("Average precision (noise detection): ", str(pixel_precision_noise))
         print("Average recall (noise detection): ", str(pixel_recall_noise))
         print("Average F1 score (noise detection): ", str(pixel_F1_score_noise))
+        print("PSNR AVERAGE: ", psnr_avg/total_noisy)
     #save list of lists of predictions into pkl file
     with open(str(save_results_path+"result.pkl"), 'wb') as f:
         pickle.dump(predicted_top_K_results, f)

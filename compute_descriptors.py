@@ -1,7 +1,7 @@
 """
 Generate descriptors of the database
 Usage:
-  compute_descriptors.py <inputDir> [--DBpicklePath=<dbppath] [--histogramType=<histType>] [--nbins=<nbins>] [--descriptorType=<dtype>] [--level=<lv>] [--max_level=<mlv>] [--lbp_radius=<lbpr>]
+  compute_descriptors.py <inputDir> [--DBpicklePath=<dbppath] [--histogramType=<histType>] [--nbins=<nbins>] [--descriptorType=<dtype>] [--level=<lv>] [--max_level=<mlv>] [--lbp_radius=<lbpr>] [--dct_block_size=<dctb>]
   compute_descriptors.py -h | --help
   -
   <inputDir>                Directory with database data 
@@ -11,10 +11,11 @@ Options:
   --DBpicklePath=<dbppath>    Filename/path to save the pkl database generated with compute_descriptors.py [default: database.pkl]
   --histogramType=<histType>  Type of histogram used to generate the descriptors (GRAYSCALE, BGR, HSV, YCRCB, LAB)  [default: GRAYSCALE]
   --nbins=<nbins>             Number of bins of the histograms [default: 16]
-  --descriptorType=<dtype>    Type of descriptor (1Dhistogram,mult_res_histogram,block_histogram,HOG,LBP) [default: 1Dhistogram]
+  --descriptorType=<dtype>    Type of descriptor (1Dhistogram,mult_res_histogram,block_histogram,HOG,LBP,DCT) [default: 1Dhistogram]
   --level=<lv>                Levels of block histogram [default: 4]
   --max_level=<mlv>           Levels of multiresolution histogram [default: 2]
-  --lbp_radius=<lbpr>         Radius used for the LBP descriptor [default: 2]
+  --lbp_radius=<lbpr>         Radius used for the LBP descriptor [default: 4]
+  --dct_block_size=<dctb>     Size of the blocks the DCT image will be split in [default: 32]
 """
 
 import pickle
@@ -59,6 +60,10 @@ def main():
       elif descriptor=="LBP":
         radius = int(args['--lbp_radius'])
         museum_config.append({"descriptorType":descriptor, "lbp_radius": radius}) #empty dictionary with config info
+
+      elif descriptor=="DCT":
+        block_size = int(args['--dct_block_size'])
+        museum_config.append({"descriptorType":descriptor, "dct_block_size":block_size}) #empty dictionary with config info
       
 
       #print configuration of each descriptor
@@ -70,8 +75,8 @@ def main():
     print("DB pickle path: ", db_pickle_path)
     #create Image objects (obtain ID and filepaths of each image)
     print("Loading images")
-    museum_dataset, dict_artists_paintings = Museum.read_images(dataset_directory)
-    
+    museum_dataset, dict_artists_paintings, dict_titles_paintings= Museum.read_images(dataset_directory)
+  
     print("Computing descriptors...")
     #compute the descriptors of our database
     for image_object in museum_dataset:

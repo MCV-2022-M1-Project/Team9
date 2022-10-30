@@ -61,6 +61,10 @@ def check_query_file(hypo_name, week, k_val, num_queries, qsn):
             sys.exit()
             
         if (len(hypo) != num_queries):
+            print("HYPO NAME ", hypo_name, "NUM QUERIES ", num_queries)
+            with open(hypo_name, "rb") as fp:   # Unpickling
+                temp = pickle.load(fp)
+            print(len(temp))
             print ('File {} should contain {} queries.'.format(hypo_name), num_queries)
             sys.exit()
 

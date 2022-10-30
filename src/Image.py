@@ -76,7 +76,17 @@ class Image:
             elif descriptorType=="LBP":
                 lbp_radius = descriptor_config.get("lbp_radius")
                 descriptor= TextureDescriptors.compute_LBP_histogram(self.convert_image_grey_scale(cropped_img), radius = lbp_radius)
-            
+
+            #dct coefficients
+            elif descriptorType=="DCT":
+                
+                block_size = descriptor_config.get("dct_block_size")
+                #print("block_size",block_size)
+                descriptor = TextureDescriptors.compute_DCT_histogram(cropped_img, block_size)
+            print("DESC TYPE ", type(descriptor[0]))
+            print("DESC POS 1 ", descriptor[0])
+            print("DESC LENGTH ", descriptor[0].shape)
+            print("CONC SHAPE ", type(concatenated_descriptors))
             concatenated_descriptors = np.concatenate([descriptor,concatenated_descriptors])
             #print("CONC SHAPE ", concatenated_descriptors.shape)
         self.descriptor = concatenated_descriptors
@@ -186,15 +196,3 @@ class Image:
         #crop image with np slicing
         img_cropped = img[first_white_pixel[0]:last_white_pixel[0],first_white_pixel[1]:last_white_pixel[1]]
         return img_cropped,first_white_pixel
-
-    def denoise(self, img):
-        """Checks if an image has to be denoised and denoises it if it's the case
-            img: target image that may have noise
-        """
-
-        #TEMPORARY!!
-        is_noisy = True
-        denoised_image = img
-
-
-        return denoised_image, is_noisy

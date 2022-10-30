@@ -44,7 +44,7 @@ class Museum:
             self.dict_artists_paintings = database_data[3]
             f.close()
         print("Reading query images")
-        self.query_set, _ = self.read_images(self.query_set_directory, is_query = True)
+        self.query_set, _ ,_= self.read_images(self.query_set_directory, is_query = True)
         
     @staticmethod
     def read_pickle(file_path):
@@ -65,6 +65,7 @@ class Museum:
         """
         images = []
         dict_artists_paintings = {} #dictionary containing all the artists and their paintings as values
+        dict_title_paintings = {} #dictionary containing all the artists and their paintings as values
         artist = None
         title = None
         for file in os.listdir(directory):
@@ -93,9 +94,13 @@ class Museum:
                         dict_artists_paintings[artist]+=[ filename_id]
                     else:
                         dict_artists_paintings[artist] = [filename_id]
+                    if title in dict_title_paintings.keys():
+                        dict_title_paintings[title]+=[ filename_id]
+                    else:
+                        dict_title_paintings[title] = [filename_id]
                 images.append(Image(file_directory,filename_id, artist = artist, title = title))
                 
-        return images, dict_artists_paintings
+        return images, dict_artists_paintings,dict_title_paintings
 
     def compute_distances(self,image1: Image, image2: Image, distance_string: str = "L2") -> float:
         """
@@ -159,38 +164,48 @@ class Museum:
 
                 curr_artist_prediction = text_string_list[idx_painting]
                 #ignore if prediction is empty
+                #ids_sorted = ids_sorted*0
                 if curr_artist_prediction != "":
-                    print("NOT IGNORED, CURR PREDICTION  ", curr_artist_prediction)
                     import textdistance
                     #if theres an artist with that key in the db dictionary, use it
                     if curr_artist_prediction in self.dict_artists_paintings.keys():
-                        print("FOUND")
                         possible_paintings_db = self.dict_artists_paintings[curr_artist_prediction]
                     else:
                         min_dist = -1
                         closest_artist_key = None
+                        dist_text = "LEV"
                         for artist in self.dict_artists_paintings:
                             lev_dist = textdistance.levenshtein.distance(artist,curr_artist_prediction)
+                            if(dist_text == "HAMMING"):
+                                # function call
+                                lev_dist=textdistance.hamming(artist, curr_artist_prediction)
+                            elif(dist_text == "JACCARD"):
+                                lev_dist = textdistance.jaccard.distance(artist,curr_artist_prediction)
                             if lev_dist<min_dist or min_dist == -1:
                                 min_dist=lev_dist
                                 closest_artist_key = artist
 
                         print("CLOSEST PREDICTION IN DB", closest_artist_key, "PREDICTION ", curr_artist_prediction)
                         possible_paintings_db = self.dict_artists_paintings[closest_artist_key]
-                    print("POSSIBLE PAINTINGS ", possible_paintings_db)
-                    print("K BEFORE ", ids_sorted)
-                    found = False
-                    for k_idx, predicted_painting_id in enumerate(ids_sorted):
-                        if predicted_painting_id in possible_paintings_db:
-                            found = True
-                            #shift list to the right 1 position and add text prediction in the first one
+                    
+                    text_only = False
+                    if text_only:
+                        ids_sorted = possible_paintings_db
+                        
+                        ids_sorted = np.pad(ids_sorted, (0, 20), 'constant', constant_values=(4, 0))
+                        
+                    else:
+                        found = False
+                        for k_idx, predicted_painting_id in enumerate(ids_sorted):
+                            if predicted_painting_id in possible_paintings_db:
+                                found = True
+                                #shift list to the right 1 position and add text prediction in the first one
+                                _ = ids_sorted.pop()
+                                ids_sorted.insert(0, predicted_painting_id)
+                                break
+                        if not found:
                             _ = ids_sorted.pop()
-                            ids_sorted.insert(0, predicted_painting_id)
-                            break
-                    if not found:
-                        _ = ids_sorted.pop()
-                        ids_sorted.insert(0, possible_paintings_db[0])
-                    print("K AFTER ", ids_sorted)
+                            ids_sorted.insert(0, possible_paintings_db[0])
             ids_sorted_list.append(ids_sorted[:K])
         return ids_sorted_list
 

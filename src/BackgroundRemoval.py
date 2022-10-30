@@ -163,6 +163,7 @@ class BackgroundRemoval:
         """
         img_greyscale = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
+        img_greyscale = cv2.medianBlur(img_greyscale, 5)
         #define kernel sizes and kernels
         kernel_size_close = 20
         kernel_size_close2 = 20
