@@ -37,6 +37,7 @@ class Image:
         """
         Given the descriptor configuration, it computes it and stores it into the descriptor property
             descriptor_config_array: array of dictionaries containing information on how to generate the descriptor
+            cropped_img: cropped image in case there's multiple paintings
         """
         concatenated_descriptors = []
 
@@ -44,11 +45,13 @@ class Image:
         if len(self.mask)==0:
             cropped_img = image
 
-        for descriptor_config in descriptor_config_array: 
+
+        for descriptor_config in descriptor_config_array:
             #generate descriptor
             descriptorType = descriptor_config.get("descriptorType")
-
-            #if it's a 1D histogram
+            weight = descriptor_config.get("weight")
+            
+            #1D histogram
             if descriptorType=="1Dhistogram":
                 nbins = descriptor_config.get("nbins")
                 histogramType = descriptor_config.get("histogramType")
@@ -79,12 +82,12 @@ class Image:
 
             #dct coefficients
             elif descriptorType=="DCT":
-                
                 block_size = descriptor_config.get("dct_block_size")
-                #print("block_size",block_size)
                 descriptor = TextureDescriptors.compute_DCT_histogram(self.convert_image_grey_scale(cropped_img))
+            
+            print("CURR WEIGH ", weight)
+            descriptor = descriptor * weight
             concatenated_descriptors = np.concatenate([descriptor,concatenated_descriptors])
-            #print("CONC SHAPE ", concatenated_descriptors.shape)
         self.descriptor = concatenated_descriptors
 
     def compute_histogram(self,BGR_image, descriptor_type:str, histogram_type:str, nbins:int,max_level=None, level = None):
@@ -116,7 +119,6 @@ class Image:
         """Removes the background of the image and saves it in a path. If computeGT is set to True, it will also compute the precision/recall of the mas compared to the GT
             method: method used to remove the background
         """
-
         #remove background using otsu
         if method =="OTSU":
             print("Removing background with OTSU")
@@ -127,8 +129,10 @@ class Image:
             mask = BackgroundRemoval.remove_background_color(im = image, colorspace=method)
         elif(method=="MORPHOLOGY"):
             print("Removing background using CONTOURS+MORPHOLOGY")
-            im = cv2.medianBlur(image,5)
             mask = BackgroundRemoval.remove_background_morph(img=image)
+        elif(method=="CANNY"):
+            print("Removing background using CANNY")
+            mask = BackgroundRemoval.remove_background_canny(img=image)
 
         return mask
 
@@ -160,24 +164,10 @@ class Image:
         if len(paintings)>max_paintings:
             #if necessary, obtain the most possible mask
             paintings = paintings[:max_paintings]
+        #sort list from left to right
         if len(paintings)>1:
+            paintings.sort(key = self.find_first_white_px)
             #sort them from left to right (only case ==2 )
-
-            white_pixels1 = np.array(np.where(paintings[0].mask == 255))
-            white_pixels1 = np.sort(white_pixels1)
-            #get coordinates of the first and last white pixels (useful to set a mask bounding box)
-            first_white_pixel1 = white_pixels1[:,0]
-
-            white_pixels2 = np.array(np.where(paintings[1].mask == 255))
-            white_pixels2 = np.sort(white_pixels2)
-
-            #get coordinates of the first and last white pixels (useful to set a mask bounding box)
-            first_white_pixel2 = white_pixels2[:,0]
-            if first_white_pixel2[1]<first_white_pixel1[1]:
-                temp = paintings[0]
-                paintings[0] = paintings[1]
-                paintings[1] =temp
-
         return paintings
     
     def crop_image_with_mask_bbox(self, img):
@@ -192,3 +182,13 @@ class Image:
         #crop image with np slicing
         img_cropped = img[first_white_pixel[0]:last_white_pixel[0],first_white_pixel[1]:last_white_pixel[1]]
         return img_cropped,first_white_pixel
+
+    def find_first_white_px(self,painting):
+        """Finds the x coordinate of the mask of a painting (useful to sort them from left to right)
+
+        """
+        white_px_coordinates = np.array(np.where(painting.mask == 255))
+        white_px_coordinates = np.sort(white_px_coordinates)
+        first_white_pixel_coord = white_px_coordinates[:,0]
+        first_white_pixel_xcoord = first_white_pixel_coord[1]
+        return first_white_pixel_xcoord

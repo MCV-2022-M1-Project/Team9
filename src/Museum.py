@@ -133,19 +133,26 @@ class Museum:
             Output: list with the ids of the K most similar images to query_image
         """
 
-
+        amount_matches = 10
+        match_treshold = 9
         ids_sorted_list = []
         for idx_painting, query_painting in enumerate(paintings):
             distances = []
             ids = []
             for BBDD_current_image in self.dataset:
                 current_distance = self.compute_distances(BBDD_current_image, query_painting,distance_string )
-                current_id = BBDD_current_image.id
+                
                 distances.append(current_distance)
+                #discard if there's not enough matches
+                #if amount_matches<match_treshold:
+                if current_distance>4500:
+                    current_id = -1
+                else:
+                    current_id = BBDD_current_image.id
                 ids.append(current_id)
 
             list_distance_ids = list(zip(distances, ids))
-
+            print("MIN", min(list_distance_ids))
             #sort ascending to descending if the highest score means the bigger the similarity
             if(distance_string=="HIST_INTERSECTION" or distance_string =="HELLINGER_KERNEL"):
                 list_distance_ids.sort(reverse = True)
@@ -164,7 +171,6 @@ class Museum:
 
                 curr_artist_prediction = text_string_list[idx_painting]
                 #ignore if prediction is empty
-                #ids_sorted = ids_sorted*0
                 if curr_artist_prediction != "":
                     import textdistance
                     #if theres an artist with that key in the db dictionary, use it

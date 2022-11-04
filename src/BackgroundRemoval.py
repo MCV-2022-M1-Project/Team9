@@ -225,6 +225,79 @@ class BackgroundRemoval:
         mask = temp_mask
 
         return mask
+    
+    @staticmethod
+    def remove_background_canny(img):
+        """
+            Given an image, the gradient of its grayscale version is computed (edges of the image) and they are expanded with morphological operations
+        
+        """
+        img_greyscale = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img_greyscale = cv2.GaussianBlur(img_greyscale,(5,5),0)
+        img_greyscale = cv2.medianBlur(img_greyscale, 5)
+        #define kernel sizes and kernels
+        kernel_size_close = 30
+        kernel_size_close2 = 50
+        kernel_size_open = 50
+        
+        gradient_kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(5,5))
+        kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_close,kernel_size_close))
+        kernel_close2 = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_close2,kernel_size_close2))
+        kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_open,kernel_size_open))
+
+        #obtain binarised gradient of grayscale image
+        mask = cv2.Canny(img,20,100)
+
+        #add zero padding for morphology tasks 
+        padding = 50
+        mask = cv2.copyMakeBorder( mask,  padding, padding, padding, padding, cv2.BORDER_CONSTANT, None, value = 0)
+        
+        
+        #slight closing to increase edge size
+        mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close)
+        
+        #cv2.imwrite("morph.png",mask)
+        #flood image starting from edge (result will have white background)
+        _,mask_flooded,_,_ = cv2.floodFill(mask.copy(), None, (0, 0), 255)
+        #get area of interest
+        mask = mask_flooded-mask
+
+        #cv2.imwrite("fill.png",mask)
+        #small opening and closing
+        
+        mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close2)
+        mask = mask =cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel_open)
+        mask = BackgroundRemoval.crop_img(mask ,padding,padding,padding,padding)
+
+        #invert it (background -> 0, foreground-> 255)
+        mask = 255-mask.astype(np.uint8)
+
+        #remove connected components under a specific size
+        nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
+        sizes = stats[1:, -1]; nb_components = nb_components - 1
+        heights = stats[1:,3]
+        widths = stats[1:,2]
+        paintings = []
+        height, width,_ = img.shape
+        fraction = 5
+        min_height= height/fraction
+        min_width = width/fraction
+
+        #set maximum on how many components to check in case there's too many
+        max_components = min(nb_components,10)
+        temp_mask = np.zeros((output.shape))
+        #for each connected component
+        for i in range(0, max_components):
+            #write it into resultant mask if its big enough
+            if(heights[i]>min_height and widths[i]>min_width):
+                temp_mask[output == i + 1] = 255
+        mask = temp_mask
+
+        #return full mask if nothing got detected
+        if(np.sum(mask)==0):
+            mask = 255-mask
+        #cv2.imwrite("final.png",mask)
+        return mask
 
     @staticmethod
     def remove_background_otsu_2( im):

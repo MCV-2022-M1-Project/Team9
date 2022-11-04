@@ -219,9 +219,33 @@ class TextDetection :
         bounding_box_cropped_im =textbox_img
         bounding_box_cropped_im_gray = cv2.cvtColor(bounding_box_cropped_im, cv2.COLOR_BGR2GRAY)
         th, bounding_box_cropped_im_binary = cv2.threshold(bounding_box_cropped_im_gray, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        total_black_px =np.sum(bounding_box_cropped_im_binary == 0)
+        total_white_px = np.sum(bounding_box_cropped_im_binary == 255)
+        if total_black_px>total_white_px:
+            bounding_box_cropped_im_binary = 255-bounding_box_cropped_im_binary
+        
+        #remove small connected components
+        bounding_box_cropped_im_binary = 255-bounding_box_cropped_im_binary
+        nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(bounding_box_cropped_im_binary, connectivity=8)
+        sizes = stats[1:, -1]; nb_components = nb_components - 1
+        heights = stats[1:,3]
+        widths = stats[1:,2]
+        paintings = []
+        min_size = 5
+        max_width = output.shape[1]*0.6
+        #for each mask
+        temp_mask = np.zeros((output.shape))
+        for i in range(0, nb_components):
+            if(sizes[i]>min_size and widths[i]<max_width):
+                temp_mask[output == i + 1] = 255
 
-        extractedInformation = pytesseract.image_to_string(bounding_box_cropped_im_binary)
+        bounding_box_cropped_im_binary = (255-temp_mask).astype(np.uint8)
+        #cv2.imwrite("test2.png", bounding_box_cropped_im_binary)
+        
+        extractedInformation = pytesseract.image_to_string(bounding_box_cropped_im_binary, config="-c 'tessedit_char_whitelist=01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ' --psm 6")
+
         extractedInformation = extractedInformation.replace("\n", "")
         extractedInformation = extractedInformation.replace("", "")
+        extractedInformation = extractedInformation.strip() #remove extra whitespaces
         return extractedInformation
         

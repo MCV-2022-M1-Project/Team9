@@ -1,7 +1,7 @@
 """
 Generate similarity results given a query folder
 Usage:
-  compute_similarity.py <queryDir> [--distance=<dist>] [--K=<k>] [--save_results_path=<ppath>] [--db_pickle_path=<dbppath>] [--remove_bg=<bg>] [--GT=<gt>] [--max_paintings=<mp>] [--read_text=<rt>] [--text_as_descriptor=<td>]
+  compute_similarity.py <queryDir> [--distance=<dist>] [--K=<k>] [--save_results_path=<ppath>] [--db_pickle_path=<dbppath>] [--remove_bg=<bg>] [--GT=<gt>] [--max_paintings=<mp>] [--read_text=<rt>] [--text_as_descriptor=<td>] [--denoise=<dn>]
   compute_similarity.py -h | --help
   -
   <queryDir>                Directory with query data
@@ -10,11 +10,12 @@ Options:
   --K=<k>                       Number of similar results to output [default: 3]
   --save_results_path=<ppath>   Filename/path to save the pkl results file (masks will be saved into the same dir if --remove_bg==True) [default: ./]
   --db_pickle_path=<dbppath>    Filename/path to load the pkl database generated with compute_descriptors.py [default: ./database.pkl]
-  --remove_bg=<bg>              Whether or not to remove the background of the query images. If the value is different than False, it will remove the background using the specified technique (False, MORPHOLOGY, HSV, LAB, OTSU) [default: False]
+  --remove_bg=<bg>              Whether or not to remove the background of the query images. If the value is different than False, it will remove the background using the specified technique (False, CANNY, MORPHOLOGY, HSV, LAB, OTSU) [default: False]
   --GT=<gt>                     Whether or not there's ground truth available (True/False) [default: True]
   --max_paintings=<mp>          Max paintings per image [default: 1]
   --read_text=<rt>              Whether or not there is text to read in the paintings [default: False]
   --text_as_descriptor=<tad>    Whether or not the text will be used to improve the k results [default: False]
+  --denoise=<dn>                Denoising mode (simple,BM3D,False) [default: False]
   
 """
 
@@ -45,7 +46,8 @@ def main():
     max_paintings = int(args['--max_paintings'])
     read_text = args['--read_text']
     text_as_descriptor = args['--text_as_descriptor']
-    
+    denoise_mode = args['--denoise']
+
     print("Query directory path: ", save_results_path)
     print("DB .pkl file path ", db_pickle_path)
     print("Save results path: ", save_results_path)
@@ -76,23 +78,30 @@ def main():
     img_cropped = None
     IoU_average = 0
     number_of_queries_mask_evaluation = 0
-    print("Computing distances with DB images...")
-
+    print("Processing queries...")
     #for each one of the queries
     for idx_query, current_query in enumerate(museum.query_set):
 
       #denoise the image if necessary 
       img = cv2.imread(current_query.file_directory)
-      img, is_noisy = Denoise.remove_noise_simple(img)
-      #img, is_noisy = Denoise.remove_noise_BM3D(img)
+      if denoise_mode=="simple":
+        img, is_noisy = Denoise.remove_noise_simple(img)
+      elif denoise_mode=='BM3D':
+        print("BM4d")
+        img, is_noisy = Denoise.remove_noise_BM3D(img)
+      else:
+        is_noisy = False
+
+      #cv2.imwrite("./denoised/"+str(current_query.id).zfill(5)+".jpg", img)
+      #continue
       #compute tp/tn/fp/fn if there's gt of the denoising
       if hasattr(museum, 'augmentations_gt'):
         
         current_gt_augm = museum.augmentations_gt[idx_query]
         
         filename_path_without_extension = current_query.file_directory.rsplit('/',1)[0]
-        if is_noisy:
-          cv2.imwrite(str("test.png"), img)
+        #if is_noisy:
+        #  cv2.imwrite(str("test.png"), img)
         non_augmented = cv2.imread(str(filename_path_without_extension+"/non_augmented/"+str(current_query.id).zfill(5)+".jpg"))
         
         #img = cv2.imread(current_query.file_directory)
@@ -262,6 +271,7 @@ def main():
         IoU_average = IoU_average/IoU_total
         print("Average IoU: ", str(IoU_average))
         print("Paintings num",paintings_num )
+        print("Text predictions: ", text_predictions)
       if hasattr(museum, 'augmentations_gt'):
         #obtain precision and recall of the noise detection
         pixel_precision_noise,pixel_recall_noise,pixel_F1_score_noise = Measures.compute_precision_recall_F1(total_noisedetect_TP, total_noisedetect_FP, total_noisedetect_FN, total_noisedetect_TN)

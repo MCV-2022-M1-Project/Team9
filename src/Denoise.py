@@ -1,30 +1,18 @@
-# from pickletools import uint8
-# from tkinter import N
+
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-import sys
-# import glob
-# import skimage
-# import os
-
 import bm3d
 
-# from skimage import io
-# from skimage import data, img_as_float
-# from skimage import img_as_ubyte
-
-# import skimage.data
-
-# from skimage.restoration import denoise_nl_means, estimate_sigma
-# from skimage.metrics import peak_signal_noise_ratio
-# from skimage.util import random_noise
 class Denoise:
 
     # Estimate noise
-    # From https://www.sciencedirect.com/science/article/abs/pii/S1077314296900600
-    # Reference https://stackoverflow.com/questions/2440504/noise-estimation-noise-measurement-in-image
     def estimate_noise(im):
+        """
+        Estimate if an image contains noise
+        From https://www.sciencedirect.com/science/article/abs/pii/S1077314296900600
+        Reference https://stackoverflow.com/questions/2440504/noise-estimation-noise-measurement-in-image
+        """
         laplacian_difference_kernel = np.array([[1,-2,1], [-2,4,-2], [1,-2,1]])
         im_gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
         im_convolved_sum = np.sum(np.abs(cv2.filter2D(src=im_gray, ddepth=-1, kernel=laplacian_difference_kernel)))
@@ -32,14 +20,17 @@ class Denoise:
         
         return sigma
 
-    # Remove noise, use different types of spatial and frequency based filters
+
     # Method 1. Use simple methods and get whichever works best
-    # We use non-local means https://www.ipol.im/pub/art/2011/bcm_nlm/article.pdf
     def remove_noise_simple(im):
+        """
+        Removes the noise of an image using different types of spatial and frequency based filters
+        We use non-local means https://www.ipol.im/pub/art/2011/bcm_nlm/article.pdf
+        """
         noise = Denoise.estimate_noise(im)
         is_noisy = False
         if noise > 4:
-            
+            print("Denoising image...")
             is_noisy = True
             # Save noise estimate of the resulting filters
             filter_results = {
@@ -110,13 +101,16 @@ class Denoise:
         return output, is_noisy
             
 
-    # Remove noise using BM3D
     # Method 2. Use BM3D implementation 
-    # https://www.ipol.im/pub/art/2012/l-bm3d/article.pdf
     def remove_noise_BM3D(im, max_width=300, max_height=300):
+        """
+            Removes the noise of an image using BM3D
+            https://www.ipol.im/pub/art/2012/l-bm3d/article.pdf
+        """
         noise = Denoise.estimate_noise(im)
         is_noisy = False
         if noise > 4:
+            print("Denoising image...")
             is_noisy = True
             height, width, _ = im.shape
             
@@ -126,7 +120,6 @@ class Denoise:
             im_preprocessed = (1/255) * im.astype(np.float64)
             im_denoised = bm3d.bm3d(im_preprocessed, sigma_psd=0.2, stage_arg=bm3d.BM3DStages.ALL_STAGES)
             
-            # print(cv2.PSNR(im_preprocessed, im_denoised))
             im_denoised = (im_denoised*255).astype(np.uint8)
             output =  im_denoised
         else:
