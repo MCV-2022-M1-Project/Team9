@@ -15,8 +15,6 @@ class TextureDescriptors:
         n_points = radius * 8
         lbp = local_binary_pattern(image, n_points, radius,method= 'default')
         
-        
-        
         n_bins = int(lbp.max() + 1)
         hist, _ = np.histogram(lbp, density=True, bins=n_bins, range=(0, n_bins))
         hist = hist/sum(hist)

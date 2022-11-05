@@ -2,6 +2,8 @@
 result.pkl
 database.pkl
 score_painting_retrieval.py
+database_ORB.pkl
+HOGHSV.pkl
 
 env/
 __pycache__/

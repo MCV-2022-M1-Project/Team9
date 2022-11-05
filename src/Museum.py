@@ -1,14 +1,15 @@
 import numpy as np
 import os
 import pickle
+import cv2
 from src.Image import Image
 from src.Measures import Measures
 from pathlib import Path
 
 class Museum:
-    def __init__(self, query_set_directory: str, db_pickle_path:str,gt_flag:str) -> None:
+    def __init__(self, query_set_directory: str, db_pickle_path:str,gt_flag:str,match_thresh:float) -> None:
         self.query_set_directory = query_set_directory  #dir of the query set
-
+        self.match_thresh = match_thresh
         #if there's ground truth, store it
         if(gt_flag=='True'):
             self.query_gt = self.read_pickle(self.query_set_directory + '/gt_corresps.pkl')
@@ -28,8 +29,7 @@ class Museum:
                             box_painting_list.append(box)
                     box_list.append(box_painting_list)
                 self.text_boxes_gt = box_list
-                #with open(str("text_boxes.pkl"), 'wb') as f:
-                #    pickle.dump(box_list, f)
+
             if Path(self.query_set_directory +'/augmentations.pkl').is_file():
                 self.augmentations_gt = self.read_pickle(self.query_set_directory +'/augmentations.pkl')
         else:
@@ -125,6 +125,48 @@ class Museum:
 
         return distance
 
+    def compute_matches(self, image1, image2):
+        # load BF matcher
+        bf = cv2.BFMatcher()
+        matches = bf.knnMatch(image1.keypoints,image2.keypoints,k=2)
+        # Apply ratio test
+        thresh_matches = []
+        for m,n in matches:
+            if m.distance < 0.75*n.distance:
+                thresh_matches.append([m.distance])
+        return thresh_matches
+    def compute_matches_FLANN(self, db_image, query_image, distance_string):
+
+        des1 = db_image.keypoints
+        des2 = query_image.keypoints
+        
+        if(des1 is not None and len(des1)>2 and des2 is not None and len(des2)>2):
+            
+            des1 = np.float32(des1)
+            des2 = np.float32(des2)
+
+            #ORB params
+            if distance_string == "HAMMING":
+                FLANN_INDEX_KDTREE = 0
+                ratio_lowe = 0.75
+                index_params= dict(algorithm = FLANN_INDEX_KDTREE, table_number = 6, key_size = 12,  multi_probe_level = 1)
+            else:
+                # FLANN parameters
+                FLANN_INDEX_KDTREE = 1
+                index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+            search_params = dict(checks=50)   # or pass empty dictionary
+            flann = cv2.FlannBasedMatcher(index_params,search_params)
+            matches = flann.knnMatch(des1,des2,k=2)
+            match_amount = 0
+            ratio_lowe = 0.75
+            # ratio test as per Lowe's paper
+            for i,(m,n) in enumerate(matches):
+                if m.distance < ratio_lowe*n.distance:
+                    match_amount = match_amount +1
+    
+            return match_amount
+        else:
+            return 0
     def retrieve_top_K_results(self, paintings: Image, K: int, distance_string:str, max_paintings : int, text_string_list:str = None) -> list:
         """Given an image of the query set, retrieve the top K images with the lowest distance speficied by distance_string from the dataset
                 query_image: Image to compute the distances against the BBDD
@@ -138,30 +180,58 @@ class Museum:
         ids_sorted_list = []
         for idx_painting, query_painting in enumerate(paintings):
             distances = []
+            matches = []
             ids = []
             for BBDD_current_image in self.dataset:
-                current_distance = self.compute_distances(BBDD_current_image, query_painting,distance_string )
-                
-                distances.append(current_distance)
-                #discard if there's not enough matches
-                #if amount_matches<match_treshold:
-                if current_distance>4500:
-                    current_id = -1
-                else:
+
+                if hasattr(BBDD_current_image, 'descriptor'):
+                    current_distance = self.compute_distances(BBDD_current_image, query_painting,distance_string )
+                    distances.append(current_distance)
+                    
                     current_id = BBDD_current_image.id
-                ids.append(current_id)
+                    #discard if there's not enough matches
+                    #if current_distance>4500:
+                    #    current_id = -1
+                    #else:
+                    #    current_id = BBDD_current_image.id
+                    ids.append(current_id)
 
-            list_distance_ids = list(zip(distances, ids))
-            print("MIN", min(list_distance_ids))
-            #sort ascending to descending if the highest score means the bigger the similarity
-            if(distance_string=="HIST_INTERSECTION" or distance_string =="HELLINGER_KERNEL"):
-                list_distance_ids.sort(reverse = True)
-            else:
-            #sort descending to ascending if the smallest distance  means the bigger the similarity
-                list_distance_ids.sort()
+                elif hasattr(BBDD_current_image, 'keypoints'):
+                    amount_matches = self.compute_matches_FLANN(BBDD_current_image, query_painting,distance_string)
+                    matches.append(amount_matches)
+                    current_id = BBDD_current_image.id
+                    ids.append(current_id)
             
-            ids_sorted = [ids for distances, ids in list_distance_ids]
+            if hasattr(BBDD_current_image, 'descriptor'):
+                list_distance_ids = list(zip(distances, ids))
+                #sort ascending to descending if the highest score means the bigger the similarity
+                if(distance_string=="HIST_INTERSECTION" or distance_string =="HELLINGER_KERNEL"):
+                    list_distance_ids.sort(reverse = True)
+                else:
+                #sort descending to ascending if the smallest distance  means the bigger the similarity
+                    list_distance_ids.sort()
+                ids_sorted = [ids for distances, ids in list_distance_ids]
+                if list_distance_ids[0][0]>self.match_thresh:
+                    #shift list to the right 1 position and add unknown flag if matches are under a threshold
+                    _ = ids_sorted.pop()
+                    ids_sorted.insert(0, -1)
+            else: 
+                list_distance_ids = list(zip(matches, ids))
+                #sort ascending to descending if the highest score means the bigger the similarity
+                list_distance_ids.sort(reverse = True)
+                ids_sorted = [ids for distances, ids in list_distance_ids]
 
+                # DISTANCE ", ids_sorted)
+                #print("LIST DISTANCE ", list_distance_ids)
+                print(len(list_distance_ids))
+                print(list_distance_ids)
+                print("MAX MATCHES: ", list_distance_ids[0][0])
+                if list_distance_ids[0][0]<self.match_thresh:
+                    #shift list to the right 1 position and add unknown flag if matches are under a threshold
+                    _ = ids_sorted.pop()
+                    ids_sorted.insert(0, -1)
+
+                #print("IDS DISTANCE AFTER", ids_sorted)
             #if improving the results with text is enabled
             if text_string_list is not None:
                 if (K<10):
@@ -213,6 +283,7 @@ class Museum:
                             _ = ids_sorted.pop()
                             ids_sorted.insert(0, possible_paintings_db[0])
             ids_sorted_list.append(ids_sorted[:K])
+        print("RES ", ids_sorted_list)
         return ids_sorted_list
 
     def compute_MAP_at_k(self, actual, predicted, k: int = 3):

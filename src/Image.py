@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import skimage
 from src.Histograms import Histograms
 from src.TextureDescriptors import TextureDescriptors
+from src.KeypointDescriptors import KeypointDescriptors
 from src.BackgroundRemoval import BackgroundRemoval
 import math
 
@@ -40,7 +41,7 @@ class Image:
             cropped_img: cropped image in case there's multiple paintings
         """
         concatenated_descriptors = []
-
+        descriptor = None
         #cropped_img is used for the texture descriptors in case the image has been cropped to separate it from the background. if it's empty, the entire image will be used
         if len(self.mask)==0:
             cropped_img = image
@@ -84,11 +85,23 @@ class Image:
             elif descriptorType=="DCT":
                 block_size = descriptor_config.get("dct_block_size")
                 descriptor = TextureDescriptors.compute_DCT_histogram(self.convert_image_grey_scale(cropped_img))
+
+            #save keypoints instead of the descriptors to match them later
+            elif descriptorType=="SIFT":
+                self.keypoints = KeypointDescriptors.compute_SIFT_descriptor(self.convert_image_grey_scale(cropped_img))
+            elif descriptorType=="SURF":
+                self.keypoints = KeypointDescriptors.compute_SURF_descriptor(self.convert_image_grey_scale(cropped_img))
+            elif descriptorType=="ORB":
+                self.keypoints = KeypointDescriptors.compute_ORB_descriptor(self.convert_image_grey_scale(cropped_img))
+            elif descriptorType=="DAISY":
+                self.keypoints = KeypointDescriptors.compute_DAISY_descriptor(self.convert_image_grey_scale(cropped_img))
+
+            if descriptor is not None:
+                descriptor = descriptor * weight
+                concatenated_descriptors = np.concatenate([descriptor,concatenated_descriptors])
             
-            print("CURR WEIGH ", weight)
-            descriptor = descriptor * weight
-            concatenated_descriptors = np.concatenate([descriptor,concatenated_descriptors])
-        self.descriptor = concatenated_descriptors
+        if len(concatenated_descriptors)>0:
+            self.descriptor = concatenated_descriptors
 
     def compute_histogram(self,BGR_image, descriptor_type:str, histogram_type:str, nbins:int,max_level=None, level = None):
         """Computes the histogram of a given image. The histogram type (grayscale, concatenated histograms,...) can be selected with histogram_type

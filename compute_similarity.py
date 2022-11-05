@@ -1,7 +1,7 @@
 """
 Generate similarity results given a query folder
 Usage:
-  compute_similarity.py <queryDir> [--distance=<dist>] [--K=<k>] [--save_results_path=<ppath>] [--db_pickle_path=<dbppath>] [--remove_bg=<bg>] [--GT=<gt>] [--max_paintings=<mp>] [--read_text=<rt>] [--text_as_descriptor=<td>] [--denoise=<dn>]
+  compute_similarity.py <queryDir> [--distance=<dist>] [--K=<k>] [--save_results_path=<ppath>] [--db_pickle_path=<dbppath>] [--remove_bg=<bg>] [--GT=<gt>] [--max_paintings=<mp>] [--read_text=<rt>] [--text_as_descriptor=<td>] [--denoise=<dn>] [--match_thresh=<mt>]
   compute_similarity.py -h | --help
   -
   <queryDir>                Directory with query data
@@ -16,7 +16,7 @@ Options:
   --read_text=<rt>              Whether or not there is text to read in the paintings [default: False]
   --text_as_descriptor=<tad>    Whether or not the text will be used to improve the k results [default: False]
   --denoise=<dn>                Denoising mode (simple,BM3D,False) [default: False]
-  
+  --match_thresh=<mt>           Threshold to decide if an image is a match or not [default: 0.05]   
 """
 
 import pickle
@@ -47,6 +47,7 @@ def main():
     read_text = args['--read_text']
     text_as_descriptor = args['--text_as_descriptor']
     denoise_mode = args['--denoise']
+    match_thresh = float(args['--match_thresh'])
 
     print("Query directory path: ", save_results_path)
     print("DB .pkl file path ", db_pickle_path)
@@ -56,7 +57,7 @@ def main():
     print("K: ", K)
     print("Distance: ", distance_arg)
     #load query images and database
-    museum = Museum(query_set_directory,db_pickle_path,gt_flag)
+    museum = Museum(query_set_directory,db_pickle_path,gt_flag, match_thresh)
       
     ##GENERATE QUERY RESULTS
     predicted_top_K_results = []    #list containing in each position a K-element list of the predictions for that query
@@ -74,6 +75,12 @@ def main():
     total_noisedetect_FN = 0
     psnr_avg = 0
     total_noisy = 0
+
+    #fscore detecting images as -1
+    total_TP_detect_unknowns = 0
+    total_FP_detect_unknowns = 0
+    total_TN_detect_unknowns = 0
+    total_FN_detect_unknowns = 0
 
     img_cropped = None
     IoU_average = 0
@@ -226,6 +233,7 @@ def main():
     if(gt_flag=='True'):
       mapk_average = 0  #average mapk
       IoU_total = 0 #amount of paintings where IoU>0 (box has been detected)
+
       #counters to keep track of the query number and the painting number
       query_num = 0
       paintings_num = 0
@@ -249,6 +257,18 @@ def main():
               IoU_total = IoU_total+1
 
           mapk_average = mapk_average+museum.compute_MAP_at_k([[painting]], [predicted_top_K_results[query_num][i]], K)
+          print("PRED ", predicted_top_K_results[query_num][i][0])
+          print("QUERY ",painting )
+          predicted_detection = predicted_top_K_results[query_num][i][0]
+          query_detection = painting
+          if query_detection == -1 and predicted_detection == -1:
+            total_TP_detect_unknowns = total_TP_detect_unknowns+1
+          elif query_detection != -1 and predicted_detection != -1:
+            total_TN_detect_unknowns = total_TN_detect_unknowns+1
+          elif query_detection == -1 and predicted_detection != -1:
+            total_FN_detect_unknowns = total_FN_detect_unknowns+1
+          elif query_detection != -1 and predicted_detection == -1:
+            total_FP_detect_unknowns = total_FP_detect_unknowns+1
           i = i+1
           paintings_num = paintings_num+1
         
@@ -258,7 +278,12 @@ def main():
       print("Ground truth: ",museum.query_gt)
       print("Predictions: ",predicted_top_K_results)
       print("MAPK score: ",mapk_score)
-
+    
+      pixel_precision_unknowns,pixel_recall_unknowns,pixel_F1_score_unknowns =Measures.compute_precision_recall_F1(total_TP_detect_unknowns, total_FP_detect_unknowns, total_FN_detect_unknowns, total_TN_detect_unknowns)
+      print("Average precision (detect unkowns): ", str(pixel_precision_unknowns))
+      print("Average recall (detect unkowns): ", str(pixel_recall_unknowns))
+      print("Average F1 score (detect unkowns): ", str(pixel_F1_score_unknowns))
+      
       #compute precision, recall and F1 score of masks if removeBG was activated
       if remove_bg_flag!= "False":
         #obtain precision and recall

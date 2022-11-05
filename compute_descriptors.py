@@ -1,7 +1,7 @@
 """
 Generate descriptors of the database
 Usage:
-  compute_descriptors.py <inputDir> [--DBpicklePath=<dbppath] [--histogramType=<histType>] [--nbins=<nbins>] [--descriptorType=<dtype>] [--level=<lv>] [--max_level=<mlv>] [--lbp_radius=<lbpr>] [--dct_block_size=<dctb>] [--weights=<wg>]
+  compute_descriptors.py <inputDir> [--DBpicklePath=<dbppath>] [--histogramType=<histType>] [--nbins=<nbins>] [--descriptorType=<dtype>] [--level=<lv>] [--max_level=<mlv>] [--lbp_radius=<lbpr>] [--dct_block_size=<dctb>] [--weights=<wg>]
   compute_descriptors.py -h | --help
   -
   <inputDir>                Directory with database data 
@@ -35,12 +35,10 @@ def main():
     descriptors_array = descriptor_type.split(",")
     if weights != "-1":
       weights_array = args['--weights'].split(",")
-    print("descripros array ", descriptors_array)
     museum_config = []
 
     #concatenate descriptors if needed (eg. colour descriptors and texture descriptors)
     for i, descriptor in enumerate(descriptors_array):
-      
       if weights != "-1":
         curr_weight = float(weights_array[i])
       else:
@@ -74,6 +72,15 @@ def main():
         block_size = int(args['--dct_block_size'])
         museum_config.append({"descriptorType":descriptor, "dct_block_size":block_size, "weight":curr_weight}) #empty dictionary with config info
       
+      elif descriptor=="SIFT":
+        museum_config.append({"descriptorType":descriptor, "weight":curr_weight})
+
+      elif descriptor=="ORB":
+        museum_config.append({"descriptorType":descriptor, "weight":curr_weight})
+      elif descriptor=="SURF":
+        museum_config.append({"descriptorType":descriptor, "weight":curr_weight})
+      elif descriptor=="DAISY":
+        museum_config.append({"descriptorType":descriptor, "weight":curr_weight})
 
       #print configuration of each descriptor
       print("Descriptor settings: ")

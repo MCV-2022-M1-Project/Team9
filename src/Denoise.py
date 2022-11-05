@@ -9,9 +9,10 @@ class Denoise:
     # Estimate noise
     def estimate_noise(im):
         """
-        Estimate if an image contains noise
+        Estimates if an image contains noise
         From https://www.sciencedirect.com/science/article/abs/pii/S1077314296900600
         Reference https://stackoverflow.com/questions/2440504/noise-estimation-noise-measurement-in-image
+
         """
         laplacian_difference_kernel = np.array([[1,-2,1], [-2,4,-2], [1,-2,1]])
         im_gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)

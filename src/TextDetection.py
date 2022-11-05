@@ -188,11 +188,6 @@ class TextDetection :
             box_points = cv2.boxPoints(rot_rect).astype(np.uint16)
             ordered_box = TextDetection.order_points_old(box_points).astype(np.uint16)
             
-            # print('Ordered')
-            # print(ordered_box)
-            # print('Not ordered')
-            # print(box_points)
-            
             final_bounding_boxes.append([ordered_box[0][0], ordered_box[0][1], ordered_box[2][0], ordered_box[2][1]])
 
         bounding_box_im = bounding_box_im*255

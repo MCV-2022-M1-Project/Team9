@@ -229,7 +229,7 @@ class BackgroundRemoval:
     @staticmethod
     def remove_background_canny(img):
         """
-            Given an image, the gradient of its grayscale version is computed (edges of the image) and they are expanded with morphological operations
+            Given an image, obtains the binarised gradient with canny and fills the background
         
         """
         img_greyscale = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
