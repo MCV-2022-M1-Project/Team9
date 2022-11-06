@@ -3,7 +3,7 @@ result.pkl
 database.pkl
 score_painting_retrieval.py
 database_ORB.pkl
-HOGHSV.pkl
+*.pkl
 
 env/
 __pycache__/
