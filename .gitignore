@@ -4,10 +4,14 @@ database.pkl
 score_painting_retrieval.py
 database_ORB.pkl
 *.pkl
+denoisedtest
 
 env/
 __pycache__/
 week1/*
 week2/*
 week3/*
+week4/*
+kpimg/*
+text/
 denoised/*

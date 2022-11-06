@@ -34,6 +34,9 @@ class TextureDescriptors:
     @staticmethod
     
     def compute_DCT_histogram(image: np.ndarray):
+        """Given an image, computes the dct coefficients
+            image: target image to compute the coefficients of
+        """
         image = np.float32(image) / 255.0
         histograms = []
         block_size = 16

@@ -13,7 +13,6 @@ class Measures:
         euclidean_distance = np.sqrt(sum_sq)
         return euclidean_distance
     
-    
     @staticmethod
     def compute_L1_distance(histogram1 : np.ndarray, histogram2 : np.ndarray) -> float:
         """Given two histograms, computes the L1 distance between them. 

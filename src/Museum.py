@@ -10,6 +10,7 @@ class Museum:
     def __init__(self, query_set_directory: str, db_pickle_path:str,gt_flag:str,match_thresh:float) -> None:
         self.query_set_directory = query_set_directory  #dir of the query set
         self.match_thresh = match_thresh
+        self.i = 0
         #if there's ground truth, store it
         if(gt_flag=='True'):
             self.query_gt = self.read_pickle(self.query_set_directory + '/gt_corresps.pkl')
@@ -175,8 +176,6 @@ class Museum:
             Output: list with the ids of the K most similar images to query_image
         """
 
-        amount_matches = 10
-        match_treshold = 9
         ids_sorted_list = []
         for idx_painting, query_painting in enumerate(paintings):
             distances = []
@@ -189,11 +188,6 @@ class Museum:
                     distances.append(current_distance)
                     
                     current_id = BBDD_current_image.id
-                    #discard if there's not enough matches
-                    #if current_distance>4500:
-                    #    current_id = -1
-                    #else:
-                    #    current_id = BBDD_current_image.id
                     ids.append(current_id)
 
                 elif hasattr(BBDD_current_image, 'keypoints'):
@@ -221,17 +215,11 @@ class Museum:
                 list_distance_ids.sort(reverse = True)
                 ids_sorted = [ids for distances, ids in list_distance_ids]
 
-                # DISTANCE ", ids_sorted)
-                #print("LIST DISTANCE ", list_distance_ids)
-                print(len(list_distance_ids))
-                print(list_distance_ids)
-                print("MAX MATCHES: ", list_distance_ids[0][0])
                 if list_distance_ids[0][0]<self.match_thresh:
                     #shift list to the right 1 position and add unknown flag if matches are under a threshold
                     _ = ids_sorted.pop()
                     ids_sorted.insert(0, -1)
 
-                #print("IDS DISTANCE AFTER", ids_sorted)
             #if improving the results with text is enabled
             if text_string_list is not None:
                 if (K<10):
@@ -283,7 +271,6 @@ class Museum:
                             _ = ids_sorted.pop()
                             ids_sorted.insert(0, possible_paintings_db[0])
             ids_sorted_list.append(ids_sorted[:K])
-        print("RES ", ids_sorted_list)
         return ids_sorted_list
 
     def compute_MAP_at_k(self, actual, predicted, k: int = 3):

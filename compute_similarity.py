@@ -81,7 +81,8 @@ def main():
     total_FP_detect_unknowns = 0
     total_TN_detect_unknowns = 0
     total_FN_detect_unknowns = 0
-
+    temp_var = 0
+    var_text = 0
     img_cropped = None
     IoU_average = 0
     number_of_queries_mask_evaluation = 0
@@ -96,11 +97,12 @@ def main():
       elif denoise_mode=='BM3D':
         print("BM4d")
         img, is_noisy = Denoise.remove_noise_BM3D(img)
+        cv2.imwrite("./d2enoisedtest/"+str(current_query.id).zfill(5)+".jpg", img)
+        continue
       else:
         is_noisy = False
 
-      #cv2.imwrite("./denoised/"+str(current_query.id).zfill(5)+".jpg", img)
-      #continue
+
       #compute tp/tn/fp/fn if there's gt of the denoising
       if hasattr(museum, 'augmentations_gt'):
         
@@ -170,12 +172,15 @@ def main():
           #if there's more than one painting, crop the region of the current one to feed it to the text detection module instead of sending the whole image
           if remove_bg_flag!="False":
             img_cropped, top_left_coordinate_offset = painting.crop_image_with_mask_bbox(img)
+            #cv2.imwrite( "./kpimg/"+str(temp_var)+".png", img_cropped)
+            temp_var = temp_var+1
           #else send the entire image
           else:
             img_cropped = img
         
           #detect text and get coordinates
           [tlx1, tly1, brx1, bry1], text_mask= TextDetection.detect_text(img = img_cropped)
+          print([tlx1, tly1, brx1, bry1])
           #if background has to be removed, pad the image to the original size (bounding box has been made in the cropped image)
           if remove_bg_flag!="False":
             text_mask = cv2.copyMakeBorder( text_mask,  top_left_coordinate_offset[0], painting.mask.shape[0]-text_mask.shape[0]-top_left_coordinate_offset[0], top_left_coordinate_offset[1], painting.mask.shape[1]-text_mask.shape[1]-top_left_coordinate_offset[1], cv2.BORDER_CONSTANT, None, value = 255)
@@ -200,9 +205,12 @@ def main():
           painting.text_coordinates = text_coordinates
           
           cropped_textbox = img[tly1:bry1,tlx1:brx1]
+          
           #if there's a textbox (something got detected), read it
           if(len(cropped_textbox)>0):
-            text_string = TextDetection.read_text(cropped_textbox)
+            
+            text_string = TextDetection.read_text(cropped_textbox, j= var_text)
+            var_text = var_text+1
           else:
             text_string = ""
 
@@ -283,7 +291,7 @@ def main():
       print("Average precision (detect unkowns): ", str(pixel_precision_unknowns))
       print("Average recall (detect unkowns): ", str(pixel_recall_unknowns))
       print("Average F1 score (detect unkowns): ", str(pixel_F1_score_unknowns))
-      
+
       #compute precision, recall and F1 score of masks if removeBG was activated
       if remove_bg_flag!= "False":
         #obtain precision and recall

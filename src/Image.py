@@ -19,6 +19,8 @@ class Image:
         #if available, store the artist and title of the painting
         self.artist = artist
         self.title = title
+        
+        self.temp = None
 
     def read_image_BGR(self) -> np.ndarray:
         return cv2.imread(self.file_directory, cv2.IMREAD_COLOR)
@@ -83,19 +85,25 @@ class Image:
 
             #dct coefficients
             elif descriptorType=="DCT":
-                block_size = descriptor_config.get("dct_block_size")
                 descriptor = TextureDescriptors.compute_DCT_histogram(self.convert_image_grey_scale(cropped_img))
 
             #save keypoints instead of the descriptors to match them later
             elif descriptorType=="SIFT":
+                
                 self.keypoints = KeypointDescriptors.compute_SIFT_descriptor(self.convert_image_grey_scale(cropped_img))
             elif descriptorType=="SURF":
-                self.keypoints = KeypointDescriptors.compute_SURF_descriptor(self.convert_image_grey_scale(cropped_img))
+                nfeat = descriptor_config.get("max_features")
+                n_octaves = descriptor_config.get("n_octaves")
+                self.keypoints = KeypointDescriptors.compute_SURF_descriptor(self.convert_image_grey_scale(cropped_img),nfeat = nfeat, n_octaves = n_octaves)
             elif descriptorType=="ORB":
-                self.keypoints = KeypointDescriptors.compute_ORB_descriptor(self.convert_image_grey_scale(cropped_img))
+                nbins = descriptor_config.get("nbins")
+                nfeat = descriptor_config.get("max_features")
+                self.keypoints = KeypointDescriptors.compute_ORB_descriptor(self.convert_image_grey_scale(cropped_img), nbins = nbins, nfeat = nfeat)
             elif descriptorType=="DAISY":
                 self.keypoints = KeypointDescriptors.compute_DAISY_descriptor(self.convert_image_grey_scale(cropped_img))
-
+            elif descriptorType=="HARRIS_LAPLACE":
+                self.keypoints = KeypointDescriptors.compute_harris_laplace_detector(self.convert_image_grey_scale(cropped_img))
+            self.temp = cropped_img
             if descriptor is not None:
                 descriptor = descriptor * weight
                 concatenated_descriptors = np.concatenate([descriptor,concatenated_descriptors])

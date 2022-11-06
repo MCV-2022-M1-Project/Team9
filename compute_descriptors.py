@@ -1,7 +1,7 @@
 """
 Generate descriptors of the database
 Usage:
-  compute_descriptors.py <inputDir> [--DBpicklePath=<dbppath>] [--histogramType=<histType>] [--nbins=<nbins>] [--descriptorType=<dtype>] [--level=<lv>] [--max_level=<mlv>] [--lbp_radius=<lbpr>] [--dct_block_size=<dctb>] [--weights=<wg>]
+  compute_descriptors.py <inputDir> [--DBpicklePath=<dbppath>] [--histogramType=<histType>] [--nbins=<nbins>] [--descriptorType=<dtype>] [--level=<lv>] [--max_level=<mlv>] [--lbp_radius=<lbpr>] [--dct_block_size=<dctb>] [--weights=<wg>] [--max_features=<mft>] [--n_octaves=<noct>]
   compute_descriptors.py -h | --help
   -
   <inputDir>                Directory with database data 
@@ -10,13 +10,15 @@ Options:
   
   --DBpicklePath=<dbppath>    Filename/path to save the pkl database generated with compute_descriptors.py [default: database.pkl]
   --histogramType=<histType>  Type of histogram used to generate the descriptors (GRAYSCALE, BGR, HSV, YCRCB, LAB)  [default: GRAYSCALE]
-  --nbins=<nbins>             Number of bins of the histograms [default: 16]
+  --nbins=<nbins>             Number of bins of the histograms [default: 32]
   --descriptorType=<dtype>    Type of descriptor (1Dhistogram,mult_res_histogram,block_histogram,HOG,LBP,DCT) [default: 1Dhistogram]
   --level=<lv>                Levels of block histogram [default: 4]
   --max_level=<mlv>           Levels of multiresolution histogram [default: 2]
   --lbp_radius=<lbpr>         Radius used for the LBP descriptor [default: 4]
   --dct_block_size=<dctb>     Size of the blocks the DCT image will be split in [default: 32]
   --weights=<wg>              Weights of the descriptors (e.g.: 0.75,0.25) [default: -1]
+  --max_features=<mft>        Max amount of descriptors for ORB,SIFT and SURF descriptors [default: 1500]
+  --n_octave=<noct>           Number of octaves (ORB descriptor) [default: 5]
 """
 
 import pickle
@@ -73,13 +75,20 @@ def main():
         museum_config.append({"descriptorType":descriptor, "dct_block_size":block_size, "weight":curr_weight}) #empty dictionary with config info
       
       elif descriptor=="SIFT":
-        museum_config.append({"descriptorType":descriptor, "weight":curr_weight})
+        max_features = int(args['--max_features'])
+        museum_config.append({"descriptorType":descriptor, "max_features": max_features, "weight":curr_weight})
 
       elif descriptor=="ORB":
-        museum_config.append({"descriptorType":descriptor, "weight":curr_weight})
+        nbins = int(args['--nbins'])
+        max_features = int(args['--max_features'])
+        museum_config.append({"descriptorType":descriptor, "nbins": nbins, "max_features": max_features, "weight":curr_weight})
       elif descriptor=="SURF":
-        museum_config.append({"descriptorType":descriptor, "weight":curr_weight})
+        max_features = int(args['--max_features'])
+        n_octaves = int(args['--n_octaves'])
+        museum_config.append({"descriptorType":descriptor, "n_octaves":n_octaves,"max_features": max_features,"weight":curr_weight})
       elif descriptor=="DAISY":
+        museum_config.append({"descriptorType":descriptor, "weight":curr_weight})
+      elif descriptor=="HARRIS_LAPLACE":
         museum_config.append({"descriptorType":descriptor, "weight":curr_weight})
 
       #print configuration of each descriptor
