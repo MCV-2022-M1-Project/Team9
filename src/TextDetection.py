@@ -396,12 +396,13 @@ class TextDetection :
 
     def detect_text(img, method='both'):
         im = img.copy()
-        
         bounding_box_im = np.ones((im.shape[0], im.shape[1]))
         
+        if len(im)<9:
+            bounding_box_im =  np.ones((im.shape[0], im.shape[1]))*255
+            return [0,0,20,20], bounding_box_im
         im_gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
         im_hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
-        
         if method == 'both' or method == 'laplace':
             bounding_box_im_laplace, final_bounding_boxes_laplace = TextDetection.get_bounding_boxes_laplace(im, im_gray, im_hsv, bounding_box_im)
             bounding_box_im_laplace = bounding_box_im_laplace.astype(np.uint8)

@@ -98,7 +98,7 @@ class Image:
             elif descriptorType=="ORB":
                 nbins = descriptor_config.get("nbins")
                 nfeat = descriptor_config.get("max_features")
-                self.keypoints = KeypointDescriptors.compute_ORB_descriptor(self.convert_image_grey_scale(cropped_img), nbins = nbins, nfeat = nfeat)
+                self.keypoints = KeypointDescriptors.compute_ORB_descriptor(self.convert_image_grey_scale(image), nbins = nbins, nfeat = nfeat, mask = self.mask)
             elif descriptorType=="DAISY":
                 self.keypoints = KeypointDescriptors.compute_DAISY_descriptor(self.convert_image_grey_scale(cropped_img))
             elif descriptorType=="HARRIS_LAPLACE":
@@ -171,7 +171,7 @@ class Image:
         heights = stats[1:,3]
         widths = stats[1:,2]
         paintings = []
-        min_size = 400
+        min_size = 10
         #set maximum on how many components to check
         max_components = min(nb_components,10)
         #for each mask
@@ -180,7 +180,7 @@ class Image:
             temp_mask[output == i + 1] = 255
             possible_painting = Image(self.file_directory,self.id)
             possible_painting.mask = temp_mask
-            if(np.sum(temp_mask)>min_size):
+            if(heights[i]>min_size and widths[i]>min_size):
                 paintings.append(possible_painting)
         if len(paintings)>max_paintings:
             #if necessary, obtain the most possible mask
@@ -202,7 +202,7 @@ class Image:
         last_white_pixel = white_pixels[:,-1]
         #crop image with np slicing
         img_cropped = img[first_white_pixel[0]:last_white_pixel[0],first_white_pixel[1]:last_white_pixel[1]]
-        return img_cropped,first_white_pixel
+        return img_cropped,first_white_pixel, last_white_pixel
 
     def find_first_white_px(self,painting):
         """Finds the x coordinate of the mask of a painting (useful to sort them from left to right)

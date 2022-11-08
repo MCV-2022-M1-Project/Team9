@@ -10,10 +10,10 @@ Options:
   --K=<k>                       Number of similar results to output [default: 3]
   --save_results_path=<ppath>   Filename/path to save the pkl results file (masks will be saved into the same dir if --remove_bg==True) [default: ./]
   --db_pickle_path=<dbppath>    Filename/path to load the pkl database generated with compute_descriptors.py [default: ./database.pkl]
-  --remove_bg=<bg>              Whether or not to remove the background of the query images. If the value is different than False, it will remove the background using the specified technique (False, CANNY, MORPHOLOGY, HSV, LAB, OTSU) [default: False]
+  --remove_bg=<bg>              Whether or not to remove the background of the query images. If the value is different than False, it will remove the background using the specified technique (False, CANNY, MORPHOLOGY, HSV, LAB, OTSU) [default: CANNY]
   --GT=<gt>                     Whether or not there's ground truth available (True/False) [default: True]
   --max_paintings=<mp>          Max paintings per image [default: 1]
-  --read_text=<rt>              Whether or not there is text to read in the paintings [default: False]
+  --read_text=<rt>              Whether or not there is text to read in the paintings [default: True]
   --text_as_descriptor=<tad>    Whether or not the text will be used to improve the k results [default: False]
   --denoise=<dn>                Denoising mode (simple,BM3D,False) [default: False]
   --match_thresh=<mt>           Threshold to decide if an image is a match or not [default: 0.05]   
@@ -21,6 +21,7 @@ Options:
 
 import pickle
 from src.Museum import Museum
+from src.Rotation import Rotation
 from src.Image import Image
 from src.TextDetection import TextDetection
 from evaluation.bbox_iou import bbox_iou
@@ -63,6 +64,8 @@ def main():
     predicted_top_K_results = []    #list containing in each position a K-element list of the predictions for that query
     text_boxes_list = []  #list containing the bbox coordinates of the predicted text boxes
     text_predictions = [] #list containing the text predictions 
+    frame_coordinates = []
+
     #mask measurements
     total_TP = 0
     total_FP = 0
@@ -84,7 +87,9 @@ def main():
     temp_var = 0
     var_text = 0
     img_cropped = None
+    #text IoU
     IoU_average = 0
+    frame_IoU_average = 0
     number_of_queries_mask_evaluation = 0
     print("Processing queries...")
     #for each one of the queries
@@ -95,25 +100,20 @@ def main():
       if denoise_mode=="simple":
         img, is_noisy = Denoise.remove_noise_simple(img)
       elif denoise_mode=='BM3D':
-        print("BM4d")
         img, is_noisy = Denoise.remove_noise_BM3D(img)
-        cv2.imwrite("./d2enoisedtest/"+str(current_query.id).zfill(5)+".jpg", img)
-        continue
+        #cv2.imwrite("./d2enoisedtest/"+str(current_query.id).zfill(5)+".jpg", img)
       else:
         is_noisy = False
 
+      #undo rotation of the image
+      fixed_rotation_img, angle = Rotation.fix_image_rotation(img)
 
       #compute tp/tn/fp/fn if there's gt of the denoising
       if hasattr(museum, 'augmentations_gt'):
-        
         current_gt_augm = museum.augmentations_gt[idx_query]
-        
         filename_path_without_extension = current_query.file_directory.rsplit('/',1)[0]
-        #if is_noisy:
-        #  cv2.imwrite(str("test.png"), img)
         non_augmented = cv2.imread(str(filename_path_without_extension+"/non_augmented/"+str(current_query.id).zfill(5)+".jpg"))
         
-        #img = cv2.imread(current_query.file_directory)
         if is_noisy:
           psnr  = cv2.PSNR(non_augmented, img)
           psnr_avg = psnr+psnr_avg
@@ -134,12 +134,10 @@ def main():
         current_query.mask = current_query.remove_background(image = img, method=remove_bg_flag)  #remove background and save the masks into the given path
         
         #save mask into inputted path
-        
         cv2.imwrite(str(save_results_path+str(current_query.id).zfill(5)+".png"), current_query.mask)
 
-        #compute metrics if there's a ground truth
+        #accumulate TP/TN/FP/FN if there's a mask ground truth
         if(gt_flag=='True'):
-        
           #load gt mask
           mask_gt_path = str(current_query.file_directory.split(".jpg")[0]+".png")
           mask_gt = cv2.imread(mask_gt_path,0)
@@ -153,35 +151,47 @@ def main():
 
         print("Query: ", current_query.file_directory)
 
+      #split mask into multiple ones if necessary
       if (max_paintings>1):
-        paintings = current_query.count_paintings(max_paintings)  #given a mask, count how may paintings there are
-
+        paintings = current_query.count_paintings(max_paintings)  #given a mask, count how may paintings there are and store them in paintings
       else:
         paintings = [current_query]
       
-      #for each painting in the query image, obtain the descriptor
       print("Found ", len(paintings), "painting(s)")
 
-      text_coordinates_query = [] #array to store all the text coordinates of a single query (there may be multiple paintings per query)
-      text_predictions_query = []
+      #text coordinates variables
+      text_coordinates_query = []   #array to store all the text coordinates of a single query (there may be multiple paintings per query)
+      text_predictions_query = []   #array to store all the text predictions of a single query (there may be multiple paintings per query)
+      frame_coordinates_query = []  #array to store all the frame coordinates of a single query (there may be multiple paintings per query)
 
+      #for each painting in the query image, obtain the descriptor
       for idx_painting, painting in enumerate(paintings):
+        #if there's more than one painting, crop the region of the current one to feed it to the text detection module instead of sending the whole image
+        if remove_bg_flag!="False":
+          img_cropped, top_left_coordinate_offset, bottom_right_coordinate_offset = painting.crop_image_with_mask_bbox(img)
+          #cv2.imwrite( "./kpimg/"+str(temp_var)+".png", img_cropped)
+          #temp_var = temp_var+1
+
+        #else send the entire image
+        else:
+          img_cropped = img
+          top_left_coordinate_offset = [0,0]
+          bottom_right_coordinate_offset = [img.shape[1]-1, img.shape[0]-1]
+
+        ###TODO convert coordinates to original domain
+        x1 = top_left_coordinate_offset[0]
+        y1 = top_left_coordinate_offset[1]
+        x2 = bottom_right_coordinate_offset[0]
+        y2 = bottom_right_coordinate_offset[1]
+        coordinates_original_domain = Rotation.rotate_coordinates((x1,y1), (x2,y1), (x2,y2), (x1,y2),-angle)
+        #save to list
+        frame_coordinates_query.append(coordinates_original_domain)
 
         if read_text=="True":
-          top_left_coordinate_offset = [0,0]
-          #if there's more than one painting, crop the region of the current one to feed it to the text detection module instead of sending the whole image
-          if remove_bg_flag!="False":
-            img_cropped, top_left_coordinate_offset = painting.crop_image_with_mask_bbox(img)
-            #cv2.imwrite( "./kpimg/"+str(temp_var)+".png", img_cropped)
-            temp_var = temp_var+1
-          #else send the entire image
-          else:
-            img_cropped = img
         
           #detect text and get coordinates
           [tlx1, tly1, brx1, bry1], text_mask= TextDetection.detect_text(img = img_cropped)
-          print([tlx1, tly1, brx1, bry1])
-          #if background has to be removed, pad the image to the original size (bounding box has been made in the cropped image)
+          #if background has to be removed, pad the mask to the original size (bounding box has been made in the cropped image)
           if remove_bg_flag!="False":
             text_mask = cv2.copyMakeBorder( text_mask,  top_left_coordinate_offset[0], painting.mask.shape[0]-text_mask.shape[0]-top_left_coordinate_offset[0], top_left_coordinate_offset[1], painting.mask.shape[1]-text_mask.shape[1]-top_left_coordinate_offset[1], cv2.BORDER_CONSTANT, None, value = 255)
           else:
@@ -217,13 +227,14 @@ def main():
           #add to query list
           text_coordinates_query.append(text_coordinates)
           text_predictions_query.append(text_string)
+        frame_coordinates.append([angle, frame_coordinates_query])
         print("Computing descriptor of painting")
         painting.compute_descriptor(img, museum.config,cropped_img = img_cropped)
       #append it to global list
       if read_text=="True":
         text_boxes_list.append(text_coordinates_query)
         text_predictions.append(text_predictions_query)
-        print("predicted names", text_predictions_query)
+        print("Predicted names", text_predictions_query)
         # open file in write mode
         with open(str(save_results_path+str(current_query.id).zfill(5)+".txt"), 'w') as fp:
             for prediction in text_predictions_query:
@@ -321,6 +332,11 @@ def main():
       print("TEXT BOXES ",text_boxes_list)
       with open(str(save_results_path+"text_boxes.pkl"), 'wb') as f:
           pickle.dump(text_boxes_list, f)
+    
+    #save list of lists of frame coordinates
+    with open(str(save_results_path+"frames.pkl"), 'wb') as f:
+        pickle.dump(frame_coordinates, f)
+    
 
 if __name__ == "__main__":
     main()

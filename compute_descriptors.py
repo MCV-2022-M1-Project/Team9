@@ -17,8 +17,8 @@ Options:
   --lbp_radius=<lbpr>         Radius used for the LBP descriptor [default: 4]
   --dct_block_size=<dctb>     Size of the blocks the DCT image will be split in [default: 32]
   --weights=<wg>              Weights of the descriptors (e.g.: 0.75,0.25) [default: -1]
-  --max_features=<mft>        Max amount of descriptors for ORB,SIFT and SURF descriptors [default: 1500]
-  --n_octave=<noct>           Number of octaves (ORB descriptor) [default: 5]
+  --max_features=<mft>        Max amount of descriptors for ORB,SIFT and SURF descriptors [default: 1000]
+  --n_octaves=<noct>          Number of octaves (ORB descriptor) [default: 5]
 """
 
 import pickle

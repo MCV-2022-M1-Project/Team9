@@ -132,6 +132,8 @@ class BackgroundRemoval:
             plt.plot(channels['channel_3']['bins'][:-1], channels['channel_3']['hist_norm'], linestyle='--', marker='o')
             plt.show()
             
+        if(np.sum(mask)==0):
+            mask = 255-mask
         return mask
     
     @staticmethod
@@ -296,7 +298,6 @@ class BackgroundRemoval:
         #return full mask if nothing got detected
         if(np.sum(mask)==0):
             mask = 255-mask
-        #cv2.imwrite("final.png",mask)
         return mask
 
     @staticmethod

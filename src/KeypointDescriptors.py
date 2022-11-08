@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 class KeypointDescriptors:
     @staticmethod
-    def compute_SIFT_descriptor(image: np.ndarray, keypoints=None, nfeat = 500):
+    def compute_SIFT_descriptor(image: np.ndarray, keypoints=None, nfeat = 500, mask = None):
         """Given an image, computes the SIFT descriptors
             image: grayscale target image to compute the histogram of
             nfeat: max amount of descriptors to return
@@ -14,7 +14,7 @@ class KeypointDescriptors:
         return des
 
     @staticmethod
-    def compute_SURF_descriptor(image : np.ndarray, keypoints=None, nfeat = 1500, n_octaves = 5):
+    def compute_SURF_descriptor(image : np.ndarray, keypoints=None, nfeat = 1500, n_octaves = 5, mask = None):
         """Given an image, computes the SURF descriptors
             image: grayscale target image to compute the histogram of
             nfeat: max amount of descriptors to return
@@ -29,14 +29,18 @@ class KeypointDescriptors:
         return des
         
     @staticmethod
-    def compute_ORB_descriptor(image: np.ndarray, keypoints=None, nfeat = 1000, nbins = 32):
+    def compute_ORB_descriptor(image: np.ndarray, keypoints=None, nfeat = 1000, nbins = 32, mask = []):
         """Given an image, computes the SURF descriptors
             image: grayscale target image to compute the histogram of
             nfeat: max amount of descriptors to return
         """
         orb = cv2.ORB_create(nfeatures=nfeat, scaleFactor = 1.2, nlevels=nbins)
-        kp = orb.detect(image,keypoints)
-        kp, des = orb.compute(image, kp)
+        
+        if len(mask)>0:
+            kp,des = orb.detectAndCompute(image, mask = mask)
+        else:
+            kp = orb.detect(image,keypoints)
+            kp, des = orb.compute(image, kp)
         
         return des
 
