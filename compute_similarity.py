@@ -24,7 +24,7 @@ from src.Museum import Museum
 from src.Rotation import Rotation
 from src.Image import Image
 from src.TextDetection import TextDetection
-from evaluation.bbox_iou import bbox_iou
+from evaluation.bbox_iou import bbox_iou, shape_iou
 from src.Measures import Measures
 from src.Denoise import Denoise
 from docopt import docopt
@@ -88,8 +88,8 @@ def main():
     var_text = 0
     img_cropped = None
     #text IoU
-    IoU_average = 0
-    frame_IoU_average = 0
+    IoU_average = 0 #store average of text IoU
+    IoU_average_frame = 0 #store average of frame IoU
     number_of_queries_mask_evaluation = 0
     print("Processing queries...")
     #for each one of the queries
@@ -101,7 +101,8 @@ def main():
         img, is_noisy = Denoise.remove_noise_simple(img)
       elif denoise_mode=='BM3D':
         img, is_noisy = Denoise.remove_noise_BM3D(img)
-        #cv2.imwrite("./d2enoisedtest/"+str(current_query.id).zfill(5)+".jpg", img)
+        #cv2.imwrite("./denoised_sd1w5/"+str(current_query.id).zfill(5)+".jpg", img)
+        #continue
       else:
         is_noisy = False
 
@@ -179,13 +180,14 @@ def main():
           bottom_right_coordinate_offset = [img.shape[1]-1, img.shape[0]-1]
 
         ###TODO convert coordinates to original domain
-        x1 = top_left_coordinate_offset[0]
-        y1 = top_left_coordinate_offset[1]
-        x2 = bottom_right_coordinate_offset[0]
-        y2 = bottom_right_coordinate_offset[1]
-        coordinates_original_domain = Rotation.rotate_coordinates((x1,y1), (x2,y1), (x2,y2), (x1,y2),-angle)
+        x1 = top_left_coordinate_offset[1]
+        x2 = bottom_right_coordinate_offset[1]
+        y1 = top_left_coordinate_offset[0]
+        y2 = bottom_right_coordinate_offset[0]
+        coord1, coord2, coord3, coord4 = Rotation.rotate_coordinates((x1,y1), (x2,y1), (x2,y2), (x1,y2), -angle)
+        coordinates_original_domain = [coord1, coord2, coord3, coord4]
         #save to list
-        frame_coordinates_query.append(coordinates_original_domain)
+        frame_coordinates_query.append([angle,coordinates_original_domain])
 
         if read_text=="True":
         
@@ -227,9 +229,12 @@ def main():
           #add to query list
           text_coordinates_query.append(text_coordinates)
           text_predictions_query.append(text_string)
-        frame_coordinates.append([angle, frame_coordinates_query])
+        
         print("Computing descriptor of painting")
         painting.compute_descriptor(img, museum.config,cropped_img = img_cropped)
+    
+      coordinates_and_angle = frame_coordinates_query
+      frame_coordinates.append(coordinates_and_angle)
       #append it to global list
       if read_text=="True":
         text_boxes_list.append(text_coordinates_query)
@@ -248,12 +253,15 @@ def main():
         #compute top k results
         predicted_top_K_results.append(museum.retrieve_top_K_results(paintings,K,distance_string = distance_arg, max_paintings = max_paintings,text_string_list = None))
 
+    #save list of lists of frame coordinates
+    with open(str(save_results_path+"frames.pkl"), 'wb') as f:
+        pickle.dump(frame_coordinates, f)
     #compute mapk score if there's ground truth
     if(gt_flag=='True'):
       mapk_average = 0  #average mapk
       IoU_total = 0 #amount of paintings where IoU>0 (box has been detected)
-
       #counters to keep track of the query number and the painting number
+      IoU_frame_total = 0
       query_num = 0
       paintings_num = 0
       for query in museum.query_gt:
@@ -264,11 +272,20 @@ def main():
           if len(predicted_top_K_results[query_num])-1<i:
             paintings_num = paintings_num+1
             continue
-            
+          
+          #compute frame iou if there's ground truth
+          if hasattr(museum, 'frames_gt'):
+            coordinates_gt = museum.frames_gt[query_num][i][1]
+            predicted_coordinates = frame_coordinates[query_num][i][1]
+            if(len(coordinates_gt)==4 and len(predicted_coordinates)==4):
+              IoU_frame = shape_iou(coordinates_gt, predicted_coordinates)
+              print("Frame IoU", IoU_frame)
+              IoU_average_frame = IoU_average_frame + IoU_frame
+              IoU_frame_total = IoU_frame_total+1
           #compute IoU if there's ground truth
           if read_text=="True":
             IoU = bbox_iou(museum.text_boxes_gt[query_num][i], text_boxes_list[query_num][i])
-            print("IoU", IoU)
+            print("Text IoU", IoU)
             IoU_average = IoU_average+IoU
 
             #increase counter of correct detections
@@ -313,7 +330,7 @@ def main():
         print("Average F1 score: ", str(pixel_F1_score))
       if read_text == "True":
         IoU_average = IoU_average/IoU_total
-        print("Average IoU: ", str(IoU_average))
+        print("Average IoU (text): ", str(IoU_average))
         print("Paintings num",paintings_num )
         print("Text predictions: ", text_predictions)
       if hasattr(museum, 'augmentations_gt'):
@@ -322,7 +339,12 @@ def main():
         print("Average precision (noise detection): ", str(pixel_precision_noise))
         print("Average recall (noise detection): ", str(pixel_recall_noise))
         print("Average F1 score (noise detection): ", str(pixel_F1_score_noise))
-        print("PSNR AVERAGE: ", psnr_avg/total_noisy)
+        if total_noisy != 0:
+          print("PSNR AVERAGE: ", psnr_avg/total_noisy)
+      if hasattr(museum, 'frames_gt'):
+        print("PAINTINGS NUM ", paintings_num)
+        IoU_average_frame = IoU_average_frame/IoU_frame_total
+        print("Average IoU (frames): ",IoU_average_frame)
     #save list of lists of predictions into pkl file
     with open(str(save_results_path+"result.pkl"), 'wb') as f:
         pickle.dump(predicted_top_K_results, f)

@@ -33,6 +33,8 @@ class Museum:
 
             if Path(self.query_set_directory +'/augmentations.pkl').is_file():
                 self.augmentations_gt = self.read_pickle(self.query_set_directory +'/augmentations.pkl')
+            if Path(self.query_set_directory +'/frames.pkl').is_file():
+                self.frames_gt = self.read_pickle(self.query_set_directory +'/frames.pkl')
         else:
             self.query_gt=[]
 

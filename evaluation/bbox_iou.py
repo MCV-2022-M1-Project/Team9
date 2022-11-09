@@ -1,3 +1,5 @@
+
+from shapely.geometry import Polygon
 def bbox_iou(bboxA, bboxB):
     # compute the intersection over union of two bboxes
 
@@ -21,3 +23,20 @@ def bbox_iou(bboxA, bboxB):
     
     # return the intersection over union value
     return iou
+
+def shape_iou(coordsA, coordsB):
+    print("COORDS A ", coordsA)
+    print("COORDS B ", coordsB)
+    coordsA_1 = coordsA[0]
+    coordsA_2 = coordsA[1]
+    coordsA_3 = coordsA[2]
+    coordsA_4 = coordsA[3]
+
+    coordsB_1 = coordsB[0]
+    coordsB_2 = coordsB[1]
+    coordsB_3 = coordsB[2]
+    coordsB_4 = coordsB[3]
+
+    a = Polygon([(coordsA_1[0], coordsA_1[1]), (coordsA_2[0], coordsA_2[1]), (coordsA_3[0], coordsA_3[1]), (coordsA_4[0], coordsA_4[1])])
+    b = Polygon([(coordsB_1[0], coordsB_1[1]), (coordsB_2[0], coordsB_2[1]), (coordsB_3[0], coordsB_3[1]), (coordsB_4[0], coordsB_4[1])])
+    return  a.intersection(b).area / a.union(b).area
