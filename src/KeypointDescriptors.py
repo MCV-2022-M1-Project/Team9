@@ -38,11 +38,13 @@ class KeypointDescriptors:
         
         if len(mask)>0:
             kp,des = orb.detectAndCompute(image, mask = mask)
+                
         else:
             kp = orb.detect(image,keypoints)
             kp, des = orb.compute(image, kp)
-        
-        return des
+
+            kp_des = des
+        return kp,des
 
     @staticmethod
     def compute_DAISY_descriptor(image: np.ndarray, keypoints = None):

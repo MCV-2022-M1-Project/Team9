@@ -35,6 +35,7 @@ class Museum:
                 self.augmentations_gt = self.read_pickle(self.query_set_directory +'/augmentations.pkl')
             if Path(self.query_set_directory +'/frames.pkl').is_file():
                 self.frames_gt = self.read_pickle(self.query_set_directory +'/frames.pkl')
+                #print("FRAMES ", self.frames_gt)
         else:
             self.query_gt=[]
 
@@ -42,6 +43,17 @@ class Museum:
         with open(db_pickle_path, 'rb') as f:
             database_data = pickle.load(f)
             self.dataset = database_data[0] #load image objects containing the id and descriptors
+            if hasattr(self.dataset[0], 'keypoints'):
+                for image in self.dataset:
+                    curr_kp = image.keypoints[0]
+                    curr_des = image.keypoints[1]
+                    new_kp = []
+                    for idx_kp in range(len(curr_kp)):
+                        point = curr_kp[idx_kp]
+                        k = cv2.KeyPoint(x=point[0][0],y=point[0][1],size=point[1], angle=point[2], 
+                            response=point[3], octave=point[4], class_id=point[5])
+                        new_kp.append(k)
+                    image.keypoints = [tuple(new_kp), curr_des]
             self.relationships = database_data[1] #load DB relationships
             self.config = database_data[2]  #load config info of how the descriptors have been generated
             self.dict_artists_paintings = database_data[3]
@@ -128,17 +140,52 @@ class Museum:
 
         return distance
 
-    def compute_matches(self, image1, image2):
-        # load BF matcher
-        bf = cv2.BFMatcher()
-        matches = bf.knnMatch(image1.keypoints,image2.keypoints,k=2)
-        # Apply ratio test
-        thresh_matches = []
-        for m,n in matches:
-            if m.distance < 0.75*n.distance:
-                thresh_matches.append([m.distance])
-        return thresh_matches
+    def compute_matches_BF(self, db_image, query_image, distance_string):
+        """
+        Computes the matches of the descriptors of two images (brute-force approach)
+            db_image, query_image: image objects to compute the matches of
+            distance_string: string specifying the distance. Must be Hamming for binary descriptors (ORB)
+        """
+        kp1,des1 = db_image.keypoints
+        kp2,des2 = query_image.keypoints
+        if(des1 is not None and len(des1)>2 and des2 is not None and len(des2)>2):
+            
+            #des1 = np.float32(des1)
+            #des2 = np.float32(des2)
+
+            # load BF matcher
+            if distance_string == "HAMMING":
+                bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+            else:
+                bf = cv2.BFMatcher()
+            #find matches
+            matches = bf.knnMatch(des1,des2, k = 2)  
+            
+            # Apply Lowe's ratio test
+            thresh_matches = []
+            match_amount = 0
+            for m,n in matches:
+                if m.distance < 0.75*n.distance:
+                    thresh_matches.append(m)
+                    match_amount = match_amount +1
+            MIN_MATCH_COUNT= 10
+            if len(thresh_matches)>MIN_MATCH_COUNT:
+                src_pts = np.float32([ kp1[m.queryIdx].pt for m in thresh_matches ]).reshape(-1,1,2)
+                dst_pts = np.float32([ kp2[m.trainIdx].pt for m in thresh_matches ]).reshape(-1,1,2)
+                M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
+                matchesMask = mask.ravel().tolist()
+                print("matchesMask", sum(matchesMask))
+                print("len thresh", match_amount)
+                return sum(matchesMask)
+            return match_amount
+        else:
+            return 0
     def compute_matches_FLANN(self, db_image, query_image, distance_string):
+        """
+        Computes the matches of the descriptors of two images using FLANN (https://docs.opencv.org/3.4/d5/d6f/tutorial_feature_flann_matcher.html)
+            db_image, query_image: image objects to compute the matches of
+            distance_string: string specifying the distance. Must be Hamming for binary descriptors (ORB)
+        """
 
         des1 = db_image.keypoints
         des2 = query_image.keypoints
@@ -193,7 +240,9 @@ class Museum:
                     ids.append(current_id)
 
                 elif hasattr(BBDD_current_image, 'keypoints'):
-                    amount_matches = self.compute_matches_FLANN(BBDD_current_image, query_painting,distance_string)
+                    
+                    amount_matches = self.compute_matches_BF(BBDD_current_image, query_painting,distance_string)
+                    #amount_matches = self.compute_matches_FLANN(BBDD_current_image, query_painting,distance_string)
                     matches.append(amount_matches)
                     current_id = BBDD_current_image.id
                     ids.append(current_id)

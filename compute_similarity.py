@@ -106,9 +106,6 @@ def main():
       else:
         is_noisy = False
 
-      #undo rotation of the image
-      fixed_rotation_img, angle = Rotation.fix_image_rotation(img)
-
       #compute tp/tn/fp/fn if there's gt of the denoising
       if hasattr(museum, 'augmentations_gt'):
         current_gt_augm = museum.augmentations_gt[idx_query]
@@ -170,6 +167,7 @@ def main():
         #if there's more than one painting, crop the region of the current one to feed it to the text detection module instead of sending the whole image
         if remove_bg_flag!="False":
           img_cropped, top_left_coordinate_offset, bottom_right_coordinate_offset = painting.crop_image_with_mask_bbox(img)
+        
           #cv2.imwrite( "./kpimg/"+str(temp_var)+".png", img_cropped)
           #temp_var = temp_var+1
 
@@ -178,6 +176,10 @@ def main():
           img_cropped = img
           top_left_coordinate_offset = [0,0]
           bottom_right_coordinate_offset = [img.shape[1]-1, img.shape[0]-1]
+
+        #undo rotation of the image
+        fixed_rotation_img, angle = Rotation.fix_image_rotation(img_cropped)
+        img_cropped = fixed_rotation_img
 
         ###TODO convert coordinates to original domain
         x1 = top_left_coordinate_offset[1]

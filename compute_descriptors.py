@@ -107,6 +107,15 @@ def main():
     for image_object in museum_dataset:
       image = image_object.read_image_BGR()
       image_object.compute_descriptor(image,museum_config)
+      #workaround to pickle keypoints (by default, keypoint objects cant be pickled)
+      if hasattr(image_object, 'keypoints'):
+        kp = image_object.keypoints[0]
+        des = image_object.keypoints[1]
+        new_keypoints = []
+        for kp_idx in range(len(kp)):
+          kp_tuple = (kp[kp_idx].pt, kp[kp_idx].size, kp[kp_idx].angle, kp[kp_idx].response, kp[kp_idx].octave, kp[kp_idx].class_id)
+          new_keypoints.append(kp_tuple)
+        image_object.keypoints = [new_keypoints, des]
 
     #read relationships file
     db_relationships = Museum.read_pickle(dataset_directory + '/relationships.pkl')
