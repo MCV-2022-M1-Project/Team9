@@ -16,7 +16,7 @@ Options:
   --read_text=<rt>              Whether or not there is text to read in the paintings [default: True]
   --text_as_descriptor=<tad>    Whether or not the text will be used to improve the k results [default: False]
   --denoise=<dn>                Denoising mode (simple,BM3D,False) [default: False]
-  --match_thresh=<mt>           Threshold to decide if an image is a match or not [default: 0.05]   
+  --match_thresh=<mt>           Threshold to decide if an image is a match or not [default: 20]   
 """
 
 import pickle

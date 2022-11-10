@@ -24,6 +24,7 @@ Options:
 import pickle
 from src.Museum import Museum
 from docopt import docopt
+import sys
 
 def main():
     #read arguments
@@ -116,7 +117,13 @@ def main():
           kp_tuple = (kp[kp_idx].pt, kp[kp_idx].size, kp[kp_idx].angle, kp[kp_idx].response, kp[kp_idx].octave, kp[kp_idx].class_id)
           new_keypoints.append(kp_tuple)
         image_object.keypoints = [new_keypoints, des]
-
+        
+    from pprint import pprint
+    for attr in dir(museum_dataset):
+      print("obj.%s = %r" % (attr, getattr(museum_dataset, attr)))
+    print("DATASET" ,sys.getsizeof(museum_dataset))
+    print("CFIG" ,sys.getsizeof(museum_config))
+    print("DICT" ,sys.getsizeof(dict_artists_paintings))
     #read relationships file
     db_relationships = Museum.read_pickle(dataset_directory + '/relationships.pkl')
 

@@ -47,6 +47,9 @@ class Image:
         #cropped_img is used for the texture descriptors in case the image has been cropped to separate it from the background. if it's empty, the entire image will be used
         if len(self.mask)==0:
             cropped_img = image
+        else:
+            print("IN")
+            self.temp = cropped_img
 
 
         for descriptor_config in descriptor_config_array:
@@ -103,7 +106,6 @@ class Image:
                 self.keypoints = KeypointDescriptors.compute_DAISY_descriptor(self.convert_image_grey_scale(cropped_img))
             elif descriptorType=="HARRIS_LAPLACE":
                 self.keypoints = KeypointDescriptors.compute_harris_laplace_detector(self.convert_image_grey_scale(cropped_img))
-            self.temp = cropped_img
             if descriptor is not None:
                 descriptor = descriptor * weight
                 concatenated_descriptors = np.concatenate([descriptor,concatenated_descriptors])
