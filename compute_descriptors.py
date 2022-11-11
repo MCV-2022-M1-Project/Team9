@@ -1,14 +1,14 @@
 """
 Generate descriptors of the database
 Usage:
-  compute_descriptors.py <inputDir> [--DBpicklePath=<dbppath>] [--histogramType=<histType>] [--nbins=<nbins>] [--descriptorType=<dtype>] [--level=<lv>] [--max_level=<mlv>] [--lbp_radius=<lbpr>] [--dct_block_size=<dctb>] [--weights=<wg>] [--max_features=<mft>] [--n_octaves=<noct>]
+  compute_descriptors.py <inputDir> [--db_pickle_path=<dbppath>] [--histogramType=<histType>] [--nbins=<nbins>] [--descriptorType=<dtype>] [--level=<lv>] [--max_level=<mlv>] [--lbp_radius=<lbpr>] [--dct_block_size=<dctb>] [--weights=<wg>] [--max_features=<mft>] [--n_octaves=<noct>]
   compute_descriptors.py -h | --help
   -
   <inputDir>                Directory with database data 
   
 Options:
   
-  --DBpicklePath=<dbppath>    Filename/path to save the pkl database generated with compute_descriptors.py [default: database.pkl]
+  --db_pickle_path=<dbppath>  Filename/path to save the pkl database generated with compute_descriptors.py [default: database.pkl]
   --histogramType=<histType>  Type of histogram used to generate the descriptors (GRAYSCALE, BGR, HSV, YCRCB, LAB)  [default: GRAYSCALE]
   --nbins=<nbins>             Number of bins of the histograms [default: 32]
   --descriptorType=<dtype>    Type of descriptor (1Dhistogram,mult_res_histogram,block_histogram,HOG,LBP,DCT) [default: 1Dhistogram]
@@ -18,7 +18,7 @@ Options:
   --dct_block_size=<dctb>     Size of the blocks the DCT image will be split in [default: 32]
   --weights=<wg>              Weights of the descriptors (e.g.: 0.75,0.25) [default: -1]
   --max_features=<mft>        Max amount of descriptors for ORB,SIFT and SURF descriptors [default: 1000]
-  --n_octaves=<noct>          Number of octaves (ORB descriptor) [default: 5]
+  --n_octaves=<noct>          Number of octaves (SURF descriptor) [default: 5]
 """
 
 import pickle
@@ -30,11 +30,10 @@ def main():
     #read arguments
     args = docopt(__doc__)
     dataset_directory = args['<inputDir>']  #path where the database is
-    db_pickle_path = args['--DBpicklePath'] #path to save the pkl database file
+    db_pickle_path = args['--db_pickle_path'] #path to save the pkl database file
     descriptor_type = args['--descriptorType'] #type of descriptor used to compare the distances
     weights =  args['--weights']  #comma separated string where each position is the weight of a descriptor
 
-    print("TYPE ", type(descriptor_type))
     descriptors_array = descriptor_type.split(",")
     if weights != "-1":
       weights_array = args['--weights'].split(",")
@@ -46,6 +45,7 @@ def main():
         curr_weight = float(weights_array[i])
       else:
         curr_weight = 1
+        
       #read options specific to the descriptor type
       if descriptor =="1Dhistogram":
         nbins = int(args['--nbins'])              # # of bins of the histogram DB 
@@ -83,10 +83,12 @@ def main():
         nbins = int(args['--nbins'])
         max_features = int(args['--max_features'])
         museum_config.append({"descriptorType":descriptor, "nbins": nbins, "max_features": max_features, "weight":curr_weight})
+
       elif descriptor=="SURF":
         max_features = int(args['--max_features'])
         n_octaves = int(args['--n_octaves'])
         museum_config.append({"descriptorType":descriptor, "n_octaves":n_octaves,"max_features": max_features,"weight":curr_weight})
+
       elif descriptor=="DAISY":
         museum_config.append({"descriptorType":descriptor, "weight":curr_weight})
       elif descriptor=="HARRIS_LAPLACE":
@@ -117,13 +119,7 @@ def main():
           kp_tuple = (kp[kp_idx].pt, kp[kp_idx].size, kp[kp_idx].angle, kp[kp_idx].response, kp[kp_idx].octave, kp[kp_idx].class_id)
           new_keypoints.append(kp_tuple)
         image_object.keypoints = [new_keypoints, des]
-        
-    from pprint import pprint
-    for attr in dir(museum_dataset):
-      print("obj.%s = %r" % (attr, getattr(museum_dataset, attr)))
-    print("DATASET" ,sys.getsizeof(museum_dataset))
-    print("CFIG" ,sys.getsizeof(museum_config))
-    print("DICT" ,sys.getsizeof(dict_artists_paintings))
+
     #read relationships file
     db_relationships = Museum.read_pickle(dataset_directory + '/relationships.pkl')
 

@@ -1,8 +1,5 @@
 #Filenames
-result.pkl
-database.pkl
 score_painting_retrieval.py
-database_ORB.pkl
 *.pkl
 denoisedtest
 
@@ -16,3 +13,6 @@ kpimg/*
 text/
 denoised/*
 denoised_qsd1w5/*
+cropped_w5/*
+masks_w5/*
+week5/*

@@ -87,6 +87,7 @@ def main():
     temp_var = 0
     var_text = 0
     img_cropped = None
+    idx_temp = 0
     #text IoU
     IoU_average = 0 #store average of text IoU
     IoU_average_frame = 0 #store average of frame IoU
@@ -190,7 +191,7 @@ def main():
         coordinates_original_domain = [coord1, coord2, coord3, coord4]
         #save to list
         frame_coordinates_query.append([angle,coordinates_original_domain])
-
+        curr_mask_before_text = painting.mask
         if read_text=="True":
         
           #detect text and get coordinates
@@ -206,6 +207,7 @@ def main():
           painting.mask = painting.mask.astype(np.uint8)
           
           #obtain intersection of the original mask and the one with the text area==0
+
           painting.mask = cv2.bitwise_and(painting.mask, text_mask)
           
           #get coordinates in the full image (text coordinates were originally from the cropped image)
@@ -231,10 +233,16 @@ def main():
           #add to query list
           text_coordinates_query.append(text_coordinates)
           text_predictions_query.append(text_string)
-        
+        if True:
+          img_cropped_with_padding, _, _ = painting.crop_image_with_mask_bbox(img, margins = 50)
+          #cv2.imwrite("./cropped_w5/"+str(idx_temp)+".png", img_cropped_with_padding)
+          
+        #mask_cropped_with_padding, _, _ = painting.crop_image_with_mask_bbox(curr_mask_before_text, margins = 50)
+        #cv2.imwrite("./masks_w5/"+str(idx_temp)+".png",mask_cropped_with_padding)
+        #idx_temp = idx_temp +1
+        ###############ROTATION HERE
         print("Computing descriptor of painting")
         painting.compute_descriptor(img, museum.config,cropped_img = img_cropped)
-    
       coordinates_and_angle = frame_coordinates_query
       frame_coordinates.append(coordinates_and_angle)
       #append it to global list

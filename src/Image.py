@@ -48,7 +48,6 @@ class Image:
         if len(self.mask)==0:
             cropped_img = image
         else:
-            print("IN")
             self.temp = cropped_img
 
 
@@ -92,12 +91,12 @@ class Image:
 
             #save keypoints instead of the descriptors to match them later
             elif descriptorType=="SIFT":
-                
-                self.keypoints = KeypointDescriptors.compute_SIFT_descriptor(self.convert_image_grey_scale(cropped_img))
+                nfeat = descriptor_config.get("max_features")
+                self.keypoints = KeypointDescriptors.compute_SIFT_descriptor(self.convert_image_grey_scale(image), nfeat = nfeat, mask = self.mask)
             elif descriptorType=="SURF":
                 nfeat = descriptor_config.get("max_features")
                 n_octaves = descriptor_config.get("n_octaves")
-                self.keypoints = KeypointDescriptors.compute_SURF_descriptor(self.convert_image_grey_scale(cropped_img),nfeat = nfeat, n_octaves = n_octaves)
+                self.keypoints = KeypointDescriptors.compute_SURF_descriptor(self.convert_image_grey_scale(image),nfeat = nfeat, n_octaves = n_octaves, mask = self.mask)
             elif descriptorType=="ORB":
                 nbins = descriptor_config.get("nbins")
                 nfeat = descriptor_config.get("max_features")
@@ -193,7 +192,7 @@ class Image:
             #sort them from left to right (only case ==2 )
         return paintings
     
-    def crop_image_with_mask_bbox(self, img):
+    def crop_image_with_mask_bbox(self, img, margins = 0):
         """Crops an image with the shape of the bounding box of its mask
             img: image to crop
         """
@@ -203,6 +202,15 @@ class Image:
         first_white_pixel = white_pixels[:,0]
         last_white_pixel = white_pixels[:,-1]
         #crop image with np slicing
+        if margins >0:
+            dim = img.shape
+            h = dim[0]
+            w = dim[1]
+            first_white_pixel[0] = max(first_white_pixel[0]-margins,0)
+            first_white_pixel[1] = max(first_white_pixel[1]-margins,0)
+
+            last_white_pixel[0] = min(last_white_pixel[0]+margins,h-1)
+            last_white_pixel[1] = min(last_white_pixel[1]+margins,w-1)
         img_cropped = img[first_white_pixel[0]:last_white_pixel[0],first_white_pixel[1]:last_white_pixel[1]]
         return img_cropped,first_white_pixel, last_white_pixel
 
