@@ -28,6 +28,8 @@ from evaluation.bbox_iou import bbox_iou, shape_iou
 from src.Measures import Measures
 from src.Denoise import Denoise
 from docopt import docopt
+import skimage
+from skimage import data, draw, io
 import cv2,sys
 import numpy as np
 
@@ -187,8 +189,28 @@ def main():
         x2 = bottom_right_coordinate_offset[1]
         y1 = top_left_coordinate_offset[0]
         y2 = bottom_right_coordinate_offset[0]
-        coord1, coord2, coord3, coord4 = Rotation.rotate_coordinates((x1,y1), (x2,y1), (x2,y2), (x1,y2), -angle)
+        ##########TEMP
+        #angle = -1
+        mean_x = (x2-x1)/2
+        mean_y = (y2-y1)/2
+        origin = (mean_x, mean_y)
+        coord1, coord2, coord3, coord4 = Rotation.rotate_coordinates((x1,y1), (x2,y1), (x2,y2), (x1,y2), -angle, origin)
         coordinates_original_domain = [coord1, coord2, coord3, coord4]
+        draw = False
+        if draw :
+          row, col = draw.polygon_perimeter((coord1[1],coord2[1],coord3[1],coord4[1]), (coord1[0],coord2[0],coord3[0],coord4[0]))
+          temp_img = img.copy()
+          temp_img[row, col] = (255,0,0)
+          cv2.imwrite("./rotation/"+str(idx_temp)+".png",temp_img)
+        idx_temp = idx_temp +1
+        if True:
+          img_cropped_with_padding, _, _ = painting.crop_image_with_mask_bbox(img, margins = 50)
+          #cv2.imwrite("./cropped_w5/"+str(idx_temp)+".png", img_cropped_with_padding)
+          
+        #mask_cropped_with_padding, _, _ = painting.crop_image_with_mask_bbox(curr_mask_before_text, margins = 50)
+        #cv2.imwrite("./masks_w5/"+str(idx_temp)+".png",mask_cropped_with_padding)
+        #idx_temp = idx_temp +1
+
         #save to list
         frame_coordinates_query.append([angle,coordinates_original_domain])
         curr_mask_before_text = painting.mask
@@ -233,14 +255,7 @@ def main():
           #add to query list
           text_coordinates_query.append(text_coordinates)
           text_predictions_query.append(text_string)
-        if True:
-          img_cropped_with_padding, _, _ = painting.crop_image_with_mask_bbox(img, margins = 50)
-          #cv2.imwrite("./cropped_w5/"+str(idx_temp)+".png", img_cropped_with_padding)
-          
-        #mask_cropped_with_padding, _, _ = painting.crop_image_with_mask_bbox(curr_mask_before_text, margins = 50)
-        #cv2.imwrite("./masks_w5/"+str(idx_temp)+".png",mask_cropped_with_padding)
-        #idx_temp = idx_temp +1
-        ###############ROTATION HERE
+
         print("Computing descriptor of painting")
         painting.compute_descriptor(img, museum.config,cropped_img = img_cropped)
       coordinates_and_angle = frame_coordinates_query

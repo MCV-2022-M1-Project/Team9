@@ -174,8 +174,6 @@ class Museum:
                 dst_pts = np.float32([ kp2[m.trainIdx].pt for m in thresh_matches ]).reshape(-1,1,2)
                 M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
                 matchesMask = mask.ravel().tolist()
-                print("matchesMask", sum(matchesMask))
-                print("len thresh", match_amount)
                 return sum(matchesMask)
             return match_amount
         else:

@@ -20,23 +20,18 @@ class Rotation:
         return rotated_image, angle
     
     @staticmethod
-    def rotate_coordinates(top_left, top_right, bottom_right, bottom_left, angle):
+    def rotate_coordinates(top_left, top_right, bottom_right, bottom_left, angle,origin):
         """Given 4 coordinates and an angle, returns the same coordinates rotated by angle degrees
             top_left, top_right, bottom_right, bottom_left: Coordinates in the format (x,y)
             angle: angle in degrees between 0 and 180
         """
         ###TODO 
-        rotated_points = Rotation.rotate([top_left, top_right,bottom_right,bottom_left])
+        rotated_points = Rotation.rotate([top_left, top_right,bottom_right,bottom_left], origin = origin,degrees = angle)
         top_left_rotated = rotated_points[0]
         top_right_rotated = rotated_points[1]
         bottom_right_rotated = rotated_points[2]
         bottom_left_rotated = rotated_points[3]
-        """
-        top_left_rotated = top_left
-        top_right_rotated = top_right
-        bottom_right_rotated = bottom_right
-        bottom_left_rotated = bottom_left
-        """
+
         return top_left_rotated, top_right_rotated, bottom_right_rotated, bottom_left_rotated
         
         ##!!!UNTESTED!!!
