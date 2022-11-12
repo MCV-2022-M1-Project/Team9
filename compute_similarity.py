@@ -1,7 +1,7 @@
 """
 Generate similarity results given a query folder
 Usage:
-  compute_similarity.py <queryDir> [--distance=<dist>] [--K=<k>] [--save_results_path=<ppath>] [--db_pickle_path=<dbppath>] [--remove_bg=<bg>] [--GT=<gt>] [--max_paintings=<mp>] [--read_text=<rt>] [--text_as_descriptor=<td>] [--denoise=<dn>] [--match_thresh=<mt>]
+  compute_similarity.py <queryDir> [--distance=<dist>] [--K=<k>] [--save_results_path=<ppath>] [--db_pickle_path=<dbppath>] [--remove_bg=<bg>] [--GT=<gt>] [--max_paintings=<mp>] [--read_text=<rt>] [--text_as_descriptor=<td>] [--denoise=<dn>] [--match_thresh=<mt>] [--rotation=<rtt>]
   compute_similarity.py -h | --help
   -
   <queryDir>                Directory with query data
@@ -17,6 +17,7 @@ Options:
   --text_as_descriptor=<tad>    Whether or not the text will be used to improve the k results [default: False]
   --denoise=<dn>                Denoising mode (simple,BM3D,False) [default: False]
   --match_thresh=<mt>           Threshold to decide if an image is a match or not [default: 20]   
+  --rotation=<rtt>              Whether or not to correct the rotation of images [default: True]
 """
 
 import pickle
@@ -51,6 +52,7 @@ def main():
     text_as_descriptor = args['--text_as_descriptor']
     denoise_mode = args['--denoise']
     match_thresh = float(args['--match_thresh'])
+    rotation = args['--rotation']
 
     print("Query directory path: ", save_results_path)
     print("DB .pkl file path ", db_pickle_path)
@@ -170,7 +172,11 @@ def main():
         #if there's more than one painting, crop the region of the current one to feed it to the text detection module instead of sending the whole image
         if remove_bg_flag!="False":
           img_cropped, top_left_coordinate_offset, bottom_right_coordinate_offset = painting.crop_image_with_mask_bbox(img)
-        
+          img_cropped_with_padding, _, _ = painting.crop_image_with_mask_bbox(img, margins = 50)
+          #cv2.imwrite("./cropped_w5/"+str(idx_temp)+".png", img_cropped_with_padding)
+          
+          curr_mask_before_text = painting.mask
+          curr_mask_before_text, _, _ = painting.crop_image_with_mask_bbox(curr_mask_before_text, margins = 0)
           #cv2.imwrite( "./kpimg/"+str(temp_var)+".png", img_cropped)
           #temp_var = temp_var+1
 
@@ -180,70 +186,77 @@ def main():
           top_left_coordinate_offset = [0,0]
           bottom_right_coordinate_offset = [img.shape[1]-1, img.shape[0]-1]
 
-        #undo rotation of the image
-        fixed_rotation_img, angle = Rotation.fix_image_rotation(img_cropped)
-        img_cropped = fixed_rotation_img
-
-        ###TODO convert coordinates to original domain
         x1 = top_left_coordinate_offset[1]
         x2 = bottom_right_coordinate_offset[1]
         y1 = top_left_coordinate_offset[0]
         y2 = bottom_right_coordinate_offset[0]
-        ##########TEMP
-        #angle = -1
-        mean_x = (x2-x1)/2
-        mean_y = (y2-y1)/2
-        origin = (mean_x, mean_y)
-        coord1, coord2, coord3, coord4 = Rotation.rotate_coordinates((x1,y1), (x2,y1), (x2,y2), (x1,y2), -angle, origin)
-        coordinates_original_domain = [coord1, coord2, coord3, coord4]
-        draw = False
-        if draw :
+        offsets = [x1,y1,x2,y2]
+        #undo rotation of the image
+        fixed_rotation_img, fixed_rotation_mask, angle, coordinates_original_domain = Rotation.fix_image_rotation(img_cropped_with_padding, img,painting.mask, painting,offsets,img.shape)
+        img_cropped = fixed_rotation_img
+        painting.mask = fixed_rotation_mask
+        #fix angle  #convert to proper format (0-180)
+        if angle<0:
+            angle = angle+180
+
+        draw_img = True
+        if draw_img :
+          coord1 = coordinates_original_domain[0]
+          coord2 = coordinates_original_domain[1]
+          coord3 = coordinates_original_domain[2]
+          coord4 = coordinates_original_domain[3]
           row, col = draw.polygon_perimeter((coord1[1],coord2[1],coord3[1],coord4[1]), (coord1[0],coord2[0],coord3[0],coord4[0]))
           temp_img = img.copy()
+
           temp_img[row, col] = (255,0,0)
           cv2.imwrite("./rotation/"+str(idx_temp)+".png",temp_img)
-        idx_temp = idx_temp +1
-        if True:
-          img_cropped_with_padding, _, _ = painting.crop_image_with_mask_bbox(img, margins = 50)
-          #cv2.imwrite("./cropped_w5/"+str(idx_temp)+".png", img_cropped_with_padding)
-          
-        #mask_cropped_with_padding, _, _ = painting.crop_image_with_mask_bbox(curr_mask_before_text, margins = 50)
-        #cv2.imwrite("./masks_w5/"+str(idx_temp)+".png",mask_cropped_with_padding)
-        #idx_temp = idx_temp +1
+          cv2.imwrite("./rotation/"+"cropped_"+str(idx_temp)+".png",fixed_rotation_img)
+          idx_temp = idx_temp +1
 
         #save to list
         frame_coordinates_query.append([angle,coordinates_original_domain])
-        curr_mask_before_text = painting.mask
         if read_text=="True":
         
           #detect text and get coordinates
           [tlx1, tly1, brx1, bry1], text_mask= TextDetection.detect_text(img = img_cropped)
+          text_mask_relative = text_mask
           #if background has to be removed, pad the mask to the original size (bounding box has been made in the cropped image)
-          if remove_bg_flag!="False":
-            text_mask = cv2.copyMakeBorder( text_mask,  top_left_coordinate_offset[0], painting.mask.shape[0]-text_mask.shape[0]-top_left_coordinate_offset[0], top_left_coordinate_offset[1], painting.mask.shape[1]-text_mask.shape[1]-top_left_coordinate_offset[1], cv2.BORDER_CONSTANT, None, value = 255)
-          else:
-            painting.mask = np.ones((img.shape[0],img.shape[1]))
-          
-          #cast to uint8
-          text_mask = text_mask.astype(np.uint8)
-          painting.mask = painting.mask.astype(np.uint8)
-          
-          #obtain intersection of the original mask and the one with the text area==0
+          if rotation == "False":
+            if remove_bg_flag!="False":
+              text_mask = cv2.copyMakeBorder( text_mask,  top_left_coordinate_offset[0], max(painting.mask.shape[0]-text_mask.shape[0]-top_left_coordinate_offset[0],0), top_left_coordinate_offset[1], max(painting.mask.shape[1]-text_mask.shape[1]-top_left_coordinate_offset[1],0), cv2.BORDER_CONSTANT, None, value = 255)
+            else:
+              painting.mask = np.ones((img.shape[0],img.shape[1]))
 
-          painting.mask = cv2.bitwise_and(painting.mask, text_mask)
-          
-          #get coordinates in the full image (text coordinates were originally from the cropped image)
-          tlx1=tlx1+top_left_coordinate_offset[1]
-          brx1=brx1+top_left_coordinate_offset[1]
-          tly1=tly1+top_left_coordinate_offset[0]
-          bry1=bry1+top_left_coordinate_offset[0]
+            #cast to uint8
+            text_mask = text_mask.astype(np.uint8)
+            painting.mask = painting.mask.astype(np.uint8)
+            
+            #obtain intersection of the original mask and the one with the text area==0
 
-          text_coordinates = [tlx1, tly1, brx1, bry1]
-          bounding_box_im = cv2.rectangle(img.copy(), (tlx1,tly1), (brx1,bry1), (0,0,0), -1)
-          painting.text_coordinates = text_coordinates
-          
-          cropped_textbox = img[tly1:bry1,tlx1:brx1]
-          
+            painting.mask = cv2.bitwise_and(painting.mask, text_mask)
+            
+            #get coordinates in the full image (text coordinates were originally from the cropped image)
+            tlx1=tlx1+top_left_coordinate_offset[1]
+            brx1=brx1+top_left_coordinate_offset[1]
+            tly1=tly1+top_left_coordinate_offset[0]
+            bry1=bry1+top_left_coordinate_offset[0]
+
+            text_coordinates = [tlx1, tly1, brx1, bry1]
+            bounding_box_im = cv2.rectangle(img.copy(), (tlx1,tly1), (brx1,bry1), (0,0,0), -1)
+            painting.text_coordinates = text_coordinates
+            
+            cropped_textbox = img[tly1:bry1,tlx1:brx1]
+            
+          else:  
+            #COORDINATES ARE A PLACEHOLDER, TEXT COORDINATE OUTPUT (text_boxes.pkl) IS NOT IMPLEMENTED FOR ROTATION (they're not rotated)
+            text_coordinates = [tlx1, tly1, brx1, bry1]
+            cropped_textbox = img_cropped[tly1:bry1,tlx1:brx1]
+            
+            #cast to uint8
+            text_mask = text_mask.astype(np.uint8)
+            painting.mask = painting.mask.astype(np.uint8)
+            painting.mask = cv2.bitwise_and(painting.mask, text_mask)
+
           #if there's a textbox (something got detected), read it
           if(len(cropped_textbox)>0):
             
@@ -257,6 +270,8 @@ def main():
           text_predictions_query.append(text_string)
 
         print("Computing descriptor of painting")
+        cv2.imwrite("./descriptors_test/"+"cropped_img"+str(idx_temp)+".png",img_cropped)
+        cv2.imwrite("./descriptors_test/"+"mask"+str(idx_temp)+".png",painting.mask)
         painting.compute_descriptor(img, museum.config,cropped_img = img_cropped)
       coordinates_and_angle = frame_coordinates_query
       frame_coordinates.append(coordinates_and_angle)

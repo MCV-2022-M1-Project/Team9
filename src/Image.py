@@ -49,6 +49,7 @@ class Image:
             cropped_img = image
         else:
             self.temp = cropped_img
+            image = cropped_img
 
 
         for descriptor_config in descriptor_config_array:
@@ -192,11 +193,15 @@ class Image:
             #sort them from left to right (only case ==2 )
         return paintings
     
-    def crop_image_with_mask_bbox(self, img, margins = 0):
+    def crop_image_with_mask_bbox(self, img, mask = [],margins = 0):
         """Crops an image with the shape of the bounding box of its mask
             img: image to crop
         """
-        white_pixels = np.array(np.where(self.mask == 255))
+        if len(mask)==0:
+            white_pixels = np.array(np.where(self.mask == 255))
+        else:
+            white_pixels = np.array(np.where(mask == 255))
+
         white_pixels = np.sort(white_pixels)
         #get coordinates of the first and last white pixels (useful to set a mask bounding box)
         first_white_pixel = white_pixels[:,0]
@@ -208,9 +213,9 @@ class Image:
             w = dim[1]
             first_white_pixel[0] = max(first_white_pixel[0]-margins,0)
             first_white_pixel[1] = max(first_white_pixel[1]-margins,0)
-
             last_white_pixel[0] = min(last_white_pixel[0]+margins,h-1)
             last_white_pixel[1] = min(last_white_pixel[1]+margins,w-1)
+
         img_cropped = img[first_white_pixel[0]:last_white_pixel[0],first_white_pixel[1]:last_white_pixel[1]]
         return img_cropped,first_white_pixel, last_white_pixel
 
