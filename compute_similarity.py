@@ -33,7 +33,7 @@ import skimage
 from skimage import data, draw, io
 import cv2,sys
 import numpy as np
-
+import math
 from pathlib import Path
 
 
@@ -95,6 +95,7 @@ def main():
     #text IoU
     IoU_average = 0 #store average of text IoU
     IoU_average_frame = 0 #store average of frame IoU
+    angle_avg_error = 0
     number_of_queries_mask_evaluation = 0
     print("Processing queries...")
     #for each one of the queries
@@ -193,20 +194,13 @@ def main():
         
         #undo rotation of the image
         fixed_rotation_img, fixed_rotation_mask, angle, coordinates_original_domain = Rotation.fix_image_rotation(img_cropped_with_padding,img, painting)
-        img_h = img.shape[0]
-        img_w = img.shape[1]
-        for coordinates in coordinates_original_domain:
-            coordinates[0] = max(coordinates[0],0)
-            coordinates[1] = max(coordinates[1],0)
-            
-            coordinates[0] = min(coordinates[0],img_w-1)
-            coordinates[1] = min(coordinates[1],img_h-1)
         img_cropped = fixed_rotation_img
         painting.mask = fixed_rotation_mask
         #fix angle  #convert to proper format (0-180)
         if angle<0:
             angle = angle+180
 
+        #save images if necessary (debugging purposes)
         draw_img = True
         if draw_img :
           coord1 = coordinates_original_domain[0]
@@ -278,8 +272,6 @@ def main():
           text_predictions_query.append(text_string)
 
         print("Computing descriptor of painting")
-        cv2.imwrite("./descriptors_test/"+"cropped_img"+str(idx_temp)+".png",img_cropped)
-        cv2.imwrite("./descriptors_test/"+"mask"+str(idx_temp)+".png",painting.mask)
         painting.compute_descriptor(img, museum.config,cropped_img = img_cropped)
       coordinates_and_angle = frame_coordinates_query
       frame_coordinates.append(coordinates_and_angle)
@@ -301,9 +293,6 @@ def main():
         #compute top k results
         predicted_top_K_results.append(museum.retrieve_top_K_results(paintings,K,distance_string = distance_arg, max_paintings = max_paintings,text_string_list = None))
 
-    #save list of lists of frame coordinates
-    with open(str(save_results_path+"frames.pkl"), 'wb') as f:
-        pickle.dump(frame_coordinates, f)
     #compute mapk score if there's ground truth
     if(gt_flag=='True'):
       mapk_average = 0  #average mapk
@@ -325,6 +314,13 @@ def main():
           if hasattr(museum, 'frames_gt'):
             coordinates_gt = museum.frames_gt[query_num][i][1]
             predicted_coordinates = frame_coordinates[query_num][i][1]
+            angle_gt =  math.radians(museum.frames_gt[query_num][i][0])
+            angle_predicted = math.radians(frame_coordinates[query_num][i][0])
+            #calculate angular error https://es.mathworks.com/matlabcentral/answers/83812-how-to-calculate-the-angular-error
+            el = [abs(np.cos(angle_gt)),np.sin(angle_gt)]
+            ee = [abs(np.cos(angle_predicted)),np.sin(angle_predicted)]
+            angle_diff = abs(np.arccos(np.dot(el,ee)) * 180 / np.pi)
+            angle_avg_error = angle_diff + angle_avg_error
             if(len(coordinates_gt)==4 and len(predicted_coordinates)==4):
               IoU_frame = shape_iou(coordinates_gt, predicted_coordinates)
               print("Frame IoU", IoU_frame)
@@ -341,8 +337,7 @@ def main():
               IoU_total = IoU_total+1
 
           mapk_average = mapk_average+museum.compute_MAP_at_k([[painting]], [predicted_top_K_results[query_num][i]], K)
-          print("PRED ", predicted_top_K_results[query_num][i][0])
-          print("QUERY ",painting )
+
           predicted_detection = predicted_top_K_results[query_num][i][0]
           query_detection = painting
           if query_detection == -1 and predicted_detection == -1:
@@ -392,7 +387,9 @@ def main():
       if hasattr(museum, 'frames_gt'):
         print("PAINTINGS NUM ", paintings_num)
         IoU_average_frame = IoU_average_frame/IoU_frame_total
+        angle_avg_error = angle_avg_error/IoU_frame_total
         print("Average IoU (frames): ",IoU_average_frame)
+        print("Mean angular error: ",angle_avg_error)
     #save list of lists of predictions into pkl file
     with open(str(save_results_path+"result.pkl"), 'wb') as f:
         pickle.dump(predicted_top_K_results, f)

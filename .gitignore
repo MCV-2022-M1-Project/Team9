@@ -2,6 +2,7 @@
 score_painting_retrieval.py
 *.pkl
 denoisedtest
+*.png
 
 env/
 __pycache__/

@@ -239,7 +239,9 @@ class Museum:
 
                 elif hasattr(BBDD_current_image, 'keypoints'):
                     
-                    amount_matches = self.compute_matches_BF(BBDD_current_image, query_painting,distance_string)
+                    #amount_matches = self.compute_matches_BF(BBDD_current_image, query_painting,distance_string)
+                    amount_matches = self.compute_matches_FLANN(BBDD_current_image, query_painting,distance_string)
+                    
                     #amount_matches = self.compute_matches_FLANN(BBDD_current_image, query_painting,distance_string)
                     matches.append(amount_matches)
                     current_id = BBDD_current_image.id

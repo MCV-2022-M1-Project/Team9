@@ -6,14 +6,14 @@ from scipy.ndimage import rotate as rotate_image
 class Rotation:   
 
     @staticmethod
-    def fix_image_rotation(padded_image_to_rotate,image, painting):
+    def fix_image_rotation(padded_image,image, painting):
         """
         Given an image, estimates the rotation of the paintings in it and returns the image after correcting the rotation. 
-        padded_image_to_rotate: cropped image that only includes 1 painting with an amount of padding
+        padded_image: cropped image that only includes 1 painting with an amount of padding
         image: full query image
-        painting: current painting object
+        painting: current painting object (has its mask as an attribute)
         """
-        img = padded_image_to_rotate
+        img = padded_image
         #estimate rotation angle 
         imgray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         blur = cv2.GaussianBlur(imgray, (5, 5), 0)
@@ -54,11 +54,10 @@ class Rotation:
 
                 delta_x = x2 - x1
                 delta_y = y2 - y1
-                #print(delta_x,delta_y)
                 
                 if delta_x !=0 and delta_y!=0:
                     angle = np.arctan(delta_y/delta_x) * 180 / np.pi
-                    print(angle)
+                    #set angle to -45,45 degree range if necessary
                     if angle > 45 and angle < 135:
                         angle = angle-90
                     elif angle >135 and angle < 180:
@@ -68,15 +67,8 @@ class Rotation:
                     elif angle <-135 and angle>-180:
                         angle = angle+180
                     
-                    rotated_img = rotate_image(img,angle)
                 else:
-                    rotated_img = img
                     angle = 0
-                print("ANGLE AFTER ",angle)
-                
-
-            #cv2.imwrite(root_folder + 'tests/'+'_hline.jpg', img)
-            #cv2.imwrite(root_folder + os.path.basename(file).split('.')[0]+'_rotated.png', rotated_img)
             
         #rotate image and mask
         rotated_mask = rotate_image(painting.mask,angle)
@@ -93,13 +85,20 @@ class Rotation:
         cnts = cnts[0] if len(cnts) == 2 else cnts[1]
         rect = cv2.minAreaRect(cnts[0])
         box = np.int0(cv2.boxPoints(rect))
-        print("BOX ", box)
         coord1 = box[0]
         coord2 = box[1]
         coord3 = box[2]
         coord4 = box[3]
         coordinates_original_domain = [coord1, coord2, coord3, coord4]
+
+        #ensure that coordinates are within the bounds of the image
+        img_h = image.shape[0]
+        img_w = image.shape[1]
+        for coordinates in coordinates_original_domain:
+            coordinates[0] = max(coordinates[0],0)
+            coordinates[1] = max(coordinates[1],0)
+            
+            coordinates[0] = min(coordinates[0],img_w-1)
+            coordinates[1] = min(coordinates[1],img_h-1)
         
-        
-        print("COORDS OG ", coordinates_original_domain)
         return rotated_image, rotated_mask, angle, coordinates_original_domain

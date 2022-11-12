@@ -247,9 +247,11 @@ class BackgroundRemoval:
         kernel_close2 = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_close2,kernel_size_close2))
         kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT,(kernel_size_open,kernel_size_open))
 
+        cv2.imwrite("1_GREYSCALE.png",img_greyscale)
         #obtain binarised gradient of grayscale image
         mask = cv2.Canny(img,20,100)
 
+        cv2.imwrite("canny.png",mask)
         #add zero padding for morphology tasks 
         padding = 50
         mask = cv2.copyMakeBorder( mask,  padding, padding, padding, padding, cv2.BORDER_CONSTANT, None, value = 0)
@@ -258,12 +260,15 @@ class BackgroundRemoval:
         #slight closing to increase edge size
         mask =cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close)
         
-        #cv2.imwrite("morph.png",mask)
+        cv2.imwrite("morph.png",mask)
         #flood image starting from edge (result will have white background)
         _,mask_flooded,_,_ = cv2.floodFill(mask.copy(), None, (0, 0), 255)
+        
+        cv2.imwrite("flood.png",mask_flooded)
         #get area of interest
         mask = mask_flooded-mask
 
+        cv2.imwrite("substract.png",mask)
         #cv2.imwrite("fill.png",mask)
         #small opening and closing
         
@@ -298,6 +303,8 @@ class BackgroundRemoval:
         #return full mask if nothing got detected
         if(np.sum(mask)==0):
             mask = 255-mask
+        
+        cv2.imwrite("final.png",mask)
         return mask
 
     @staticmethod
