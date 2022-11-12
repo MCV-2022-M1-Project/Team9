@@ -190,9 +190,17 @@ def main():
         x2 = bottom_right_coordinate_offset[1]
         y1 = top_left_coordinate_offset[0]
         y2 = bottom_right_coordinate_offset[0]
-        offsets = [x1,y1,x2,y2]
+        
         #undo rotation of the image
-        fixed_rotation_img, fixed_rotation_mask, angle, coordinates_original_domain = Rotation.fix_image_rotation(img_cropped_with_padding, img,painting.mask, painting,offsets,img.shape)
+        fixed_rotation_img, fixed_rotation_mask, angle, coordinates_original_domain = Rotation.fix_image_rotation(img_cropped_with_padding,img, painting)
+        img_h = img.shape[0]
+        img_w = img.shape[1]
+        for coordinates in coordinates_original_domain:
+            coordinates[0] = max(coordinates[0],0)
+            coordinates[1] = max(coordinates[1],0)
+            
+            coordinates[0] = min(coordinates[0],img_w-1)
+            coordinates[1] = min(coordinates[1],img_h-1)
         img_cropped = fixed_rotation_img
         painting.mask = fixed_rotation_mask
         #fix angle  #convert to proper format (0-180)
