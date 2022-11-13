@@ -35,7 +35,6 @@ class Museum:
                 self.augmentations_gt = self.read_pickle(self.query_set_directory +'/augmentations.pkl')
             if Path(self.query_set_directory +'/frames.pkl').is_file():
                 self.frames_gt = self.read_pickle(self.query_set_directory +'/frames.pkl')
-                #print("FRAMES ", self.frames_gt)
         else:
             self.query_gt=[]
 

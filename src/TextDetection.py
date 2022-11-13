@@ -43,19 +43,10 @@ class TextDetection :
             
             x, y, w, h = cv2.boundingRect(contour)
             rectanglessness = contour_area / (w * h)
-            # print(rectanglessness)
-            # print(contour_area)
             if contour_area > 1500 and contour_area < 80000:
                 if rectanglessness > 0.8:
                     new_contours.append(contour)
-                    # print(rectanglessness)
         
-        # plt.imshow(mask_im)
-        # plt.show()
-        
-        # print(new_contours)
-        
-        # sys.exit()    
         return new_contours
 
     def get_text_bounding_box_laplace(im, im_gray, im_hsv, get_negative=False, morph_open=3, extra_open=0, laplacian_kernel_center_weight=4, debug=False):
@@ -79,8 +70,6 @@ class TextDetection :
         laplacian_image = cv2.morphologyEx(laplacian_image, cv2.MORPH_OPEN, np.ones((morph_open,morph_open),np.uint8))
         if extra_open != 0:
             laplacian_image = cv2.morphologyEx(laplacian_image, cv2.MORPH_OPEN, np.ones((extra_open,extra_open),np.uint8))
-        # laplacian_image = cv2.morphologyEx(laplacian_image, cv2.MORPH_CLOSE, np.ones((7,7),np.uint8))
-        # laplacian_image = cv2.morphologyEx(laplacian_image, cv2.MORPH_CLOSE, np.ones((3,3),np.uint8))
         # Threshold low "gradients"
         laplacian_image = ((laplacian_image < 210) * 255).astype(np.uint8)
 
@@ -100,18 +89,13 @@ class TextDetection :
                 rectanglessness = contour_area / (w * h)
                 if rectanglessness > 0.8 and aspect_ratio > 2.5:
                     new_contours.append(contour)
-                # else:
-                #     mask_contours = mask_from_contours(im_hsv, contour)
-                #     for mask_contour in mask_contours:
-                #         new_contours.append(mask_contour)
+
         cv2.drawContours(im,new_contours,-1,(0,255,0),3)
         
         if debug == True:
             # Plot everything
             plt.subplot(1,2,1)
             plt.imshow(im)
-            # plt.subplot(1,2,2)
-            # plt.imshow(laplacian_image, cmap='gray')
             plt.subplot(1,2,2)
             plt.imshow(laplacian_without_saturation, cmap='gray')
             plt.show()
@@ -195,8 +179,6 @@ class TextDetection :
         x2 = boxes[:, 2]
         y2 = boxes[:, 3]
 
-        # print(x1)
-        # sys.exit()
         # compute the area of the bounding boxes and sort the bounding
         # boxes by the bottom-right y-coordinate of the bounding box
         area = (x2 - x1 + 1) * (y2 - y1 + 1)
@@ -277,8 +259,6 @@ class TextDetection :
         # We group bounding boxes based on their color and their slope, we want horizontal slope and similar colors
         for box in bounding_boxes_parsed:
             x1, y1, x2, y2 = box
-            # plt.imshow(im[y1:y2,x1:x2], cmap='gray')
-            # plt.show()
 
             cv2.rectangle(vis, (x1, y1), (x2, y2), (0, 255, 0), 1)
 
@@ -286,8 +266,6 @@ class TextDetection :
 
             region_exist = False
 
-            # plt.imshow(im[y1:y2,x1:x2])
-            # plt.show()
 
             slope_threshold = 0.15
             hist_threshold = 3
@@ -337,8 +315,6 @@ class TextDetection :
                 x1, y1, x2, y2 = region['pos']
                 bounding_boxes_parsed.append((x1, y1, x2, y2))
             bounding_boxes_parsed = np.array(bounding_boxes_parsed)
-
-            # print(bounding_boxes_parsed.shape)
 
             # If less than n boxes
             if bounding_boxes_parsed.shape[0] < 4 or bounding_boxes_parsed.shape[0] > 20:

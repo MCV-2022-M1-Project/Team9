@@ -107,11 +107,9 @@ def main():
         img, is_noisy = Denoise.remove_noise_simple(img)
       elif denoise_mode=='BM3D':
         img, is_noisy = Denoise.remove_noise_BM3D(img)
-        #cv2.imwrite("./denoised_sd1w5/"+str(current_query.id).zfill(5)+".jpg", img)
-        #continue
       else:
         is_noisy = False
-
+      
       #compute tp/tn/fp/fn if there's gt of the denoising
       if hasattr(museum, 'augmentations_gt'):
         current_gt_augm = museum.augmentations_gt[idx_query]
@@ -174,12 +172,9 @@ def main():
         if remove_bg_flag!="False":
           img_cropped, top_left_coordinate_offset, bottom_right_coordinate_offset = painting.crop_image_with_mask_bbox(img)
           img_cropped_with_padding, _, _ = painting.crop_image_with_mask_bbox(img, margins = 50)
-          #cv2.imwrite("./cropped_w5/"+str(idx_temp)+".png", img_cropped_with_padding)
           
           curr_mask_before_text = painting.mask
           curr_mask_before_text, _, _ = painting.crop_image_with_mask_bbox(curr_mask_before_text, margins = 0)
-          #cv2.imwrite( "./kpimg/"+str(temp_var)+".png", img_cropped)
-          #temp_var = temp_var+1
 
         #else send the entire image
         else:
@@ -208,8 +203,6 @@ def main():
           temp_img = img.copy()
 
           temp_img[row, col] = (255,0,0)
-          cv2.imwrite("./rotation/"+str(idx_temp)+".png",temp_img)
-          cv2.imwrite("./rotation/"+"cropped_"+str(idx_temp)+".png",fixed_rotation_img)
           idx_temp = idx_temp +1
 
         #save to list

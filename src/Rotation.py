@@ -33,7 +33,7 @@ class Rotation:
         crop = thresh[y:y+h, x:x+w] # crop to size
 
         edges = cv2.Canny(crop, 50, 150, apertureSize=3)
-        lines = cv2.HoughLines(edges, 1, np.pi/180, 200) # Find lines in image
+        lines = cv2.HoughLines(edges, 1, np.pi/180, 200) # Find lines in image. Threshold-> 200 minimum number of intersections to detect a line
 
         if lines is None:
             angle = 0
@@ -121,5 +121,4 @@ class Rotation:
                 angle = angle + 180
             elif angle_ini>0:
                 angle = 180 - angle
-        print("ANGLE ", angle)
         return rotated_image, rotated_mask, angle, coordinates_original_domain

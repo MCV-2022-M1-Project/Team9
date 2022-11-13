@@ -134,6 +134,7 @@ class BackgroundRemoval:
             
         if(np.sum(mask)==0):
             mask = 255-mask
+        cv2.imwrite("HSV.png",mask)
         return mask
     
     @staticmethod
@@ -286,7 +287,7 @@ class BackgroundRemoval:
         widths = stats[1:,2]
         paintings = []
         height, width,_ = img.shape
-        fraction = 5
+        fraction = 6
         min_height= height/fraction
         min_width = width/fraction
 

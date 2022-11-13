@@ -1,7 +1,6 @@
 #Filenames
 score_painting_retrieval.py
 *.pkl
-denoisedtest
 *.png
 
 env/
@@ -10,14 +9,5 @@ week1/*
 week2/*
 week3/*
 week4/*
-kpimg/*
-text/
-denoised/*
-denoised_qsd1w5/*
-cropped_w5/*
-masks_w5/*
 week5/*
-rotation/*
 tests*
-TEST.PNG
-descriptors_test/*
