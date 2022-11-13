@@ -37,6 +37,9 @@ class Rotation:
 
         if lines is None:
             angle = 0
+            angle_ini = 0
+            delta_x = 0
+            delta_y = 0
             pass
         else:
             img = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR) # Convert cropped black and white image to color to draw the red line
@@ -57,6 +60,7 @@ class Rotation:
                 
                 if delta_x !=0 and delta_y!=0:
                     angle = np.arctan(delta_y/delta_x) * 180 / np.pi
+                    angle_ini = angle
                     #set angle to -45,45 degree range if necessary
                     if angle > 45 and angle < 135:
                         angle = angle-90
@@ -69,6 +73,7 @@ class Rotation:
                     
                 else:
                     angle = 0
+                    angle_ini = 0
             
         #rotate image and mask
         rotated_mask = rotate_image(painting.mask,angle)
@@ -101,4 +106,20 @@ class Rotation:
             coordinates[0] = min(coordinates[0],img_w-1)
             coordinates[1] = min(coordinates[1],img_h-1)
         
+        #convert to proper format (0-180)
+        if abs(delta_y)>abs(delta_x): #if hough line is vertical 
+            if angle_ini<0 and angle<0:
+                angle = angle + 180
+            elif angle_ini<0 and angle>0:
+                angle = 180 - angle
+            elif angle_ini>0:
+                angle = -angle          
+        elif abs(delta_y)<abs(delta_x): #if hough line is horizontal
+            if angle_ini<0 and angle<0:
+                angle = -angle
+            elif angle_ini<0 and angle>0:
+                angle = angle + 180
+            elif angle_ini>0:
+                angle = 180 - angle
+        print("ANGLE ", angle)
         return rotated_image, rotated_mask, angle, coordinates_original_domain

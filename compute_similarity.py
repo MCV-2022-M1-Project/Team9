@@ -196,9 +196,6 @@ def main():
         fixed_rotation_img, fixed_rotation_mask, angle, coordinates_original_domain = Rotation.fix_image_rotation(img_cropped_with_padding,img, painting)
         img_cropped = fixed_rotation_img
         painting.mask = fixed_rotation_mask
-        #fix angle  #convert to proper format (0-180)
-        if angle<0:
-            angle = angle+180
 
         #save images if necessary (debugging purposes)
         draw_img = True

@@ -185,8 +185,8 @@ class Museum:
             distance_string: string specifying the distance. Must be Hamming for binary descriptors (ORB)
         """
 
-        des1 = db_image.keypoints
-        des2 = query_image.keypoints
+        kp1,des1 = db_image.keypoints
+        kp2,des2 = query_image.keypoints
         
         if(des1 is not None and len(des1)>2 and des2 is not None and len(des2)>2):
             
@@ -239,8 +239,8 @@ class Museum:
 
                 elif hasattr(BBDD_current_image, 'keypoints'):
                     
-                    #amount_matches = self.compute_matches_BF(BBDD_current_image, query_painting,distance_string)
-                    amount_matches = self.compute_matches_FLANN(BBDD_current_image, query_painting,distance_string)
+                    amount_matches = self.compute_matches_BF(BBDD_current_image, query_painting,distance_string)
+                    #amount_matches = self.compute_matches_FLANN(BBDD_current_image, query_painting,distance_string)
                     
                     #amount_matches = self.compute_matches_FLANN(BBDD_current_image, query_painting,distance_string)
                     matches.append(amount_matches)
